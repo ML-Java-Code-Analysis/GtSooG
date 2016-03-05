@@ -4,9 +4,9 @@ def collectData(repository_path, branch='master'):
     repo = Repo(repository_path)
     last_commit = None
     for commit in reversed(list(repo.iter_commits(branch))):
+
         print("-"*20)
         commit_id = commit.hexsha
-        commit
         print(commit_id)
         print(commit.message)
         print(commit.committer)
