@@ -1,6 +1,6 @@
 # Hauptfile, dieses ruft man dann auf
-from src import GitCollector
-from src import GitStatistics
+from gtsoog import GitCollector
+from gtsoog import GitStatistics
 
 def main():
     REPO_PATH = "P:\Studium\FS2016\BA\GitHubProjects\liferay-portal"
