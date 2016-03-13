@@ -1,6 +1,6 @@
 from git import Repo
 from gtsoog import Log
-import time
+import threading
 
 class RepositoryMiner(object):
 
@@ -16,33 +16,47 @@ class RepositoryMiner(object):
 
         previous_commit = None
 
+        threads = []
+        commit_counter=0
+
         for commit in commits:
+            commit_counter+=1
+            if commit_counter % 1000 == 0:
+                Log.log("Commit counter: " + str(commit_counter),Log.LEVEL_DEBUG)
 
             if commit.parents:
                 previous_commit = commit.parents[0]
 
             if len(commit.parents) == 1:
-                manipulated_files = self.get_changed_files(commit, previous_commit)
-
-                added_files = manipulated_files[0]
-                deleted_files = manipulated_files[1]
-                changed_files = manipulated_files[2]
-
-                Log.log("------------",Log.LEVEL_DEBUG)
-                Log.log("Commit: " + commit.message,Log.LEVEL_DEBUG)
-                Log.log("Added: " + str([file.path for file in added_files]),Log.LEVEL_DEBUG)
-                Log.log("Deleted: " + str([file.path for file in deleted_files]),Log.LEVEL_DEBUG)
-                Log.log("Changed: " + str([file.path for file in changed_files]),Log.LEVEL_DEBUG)
+                if threading.active_count() <= 15:
+                    t = threading.Thread(target=self.process_commit, args=(commit,previous_commit,))
+                    threads.append(t)
+                    t.start()
+                else:
+                    self.process_commit(commit, previous_commit)
 
 
 
+    def process_commit(self, commit, previous_commit):
+        manipulated_files = self.get_changed_files(commit, previous_commit)
+
+        added_files = manipulated_files[0]
+        deleted_files = manipulated_files[1]
+        changed_files = manipulated_files[2]
+
+        Log.log("------------",Log.LEVEL_DEBUG)
+        Log.log("Commit: " + commit.message,Log.LEVEL_DEBUG)
+        Log.log("Added: " + str([file.path for file in added_files]),Log.LEVEL_DEBUG)
+        Log.log("Deleted: " + str([file.path for file in deleted_files]),Log.LEVEL_DEBUG)
+        Log.log("Changed: " + str([file.path for file in changed_files]),Log.LEVEL_DEBUG)
+
+        return
 
     def get_commits(self):
         """
-        Get all commits of a repository exclude all merges
+        Get all commits of a repository
         Returns: commits in reversed order --> first commit is first element in list
         """
-        """commits = list(filter(lambda commit: len(commit.parents) <= 1, self.repository.iter_commits(self.branch)))"""
         commits = list(self.repository.iter_commits(self.branch))
         commits.reverse()
         return commits

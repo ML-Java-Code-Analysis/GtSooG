@@ -10,5 +10,6 @@ def main():
 
 
     RepositoryMiner(r"P:\Studium\FS2016\BA\GitHubProjects\LED-Cube-Prototyper")
+    #RepositoryMiner(r"P:\Studium\FS2016\BA\GitHubProjects\liferay-portal")
 
 main()
