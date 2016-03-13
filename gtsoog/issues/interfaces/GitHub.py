@@ -9,8 +9,8 @@ class GitHub(object):
 
     BUG_LABELS = ('bug', 'defect')
 
-    def __init__(self, domain, owner, repo, use_https=True, user=None, password=None, bug_label_names=BUG_LABELS):
-        self.domain = domain
+    def __init__(self, api_url, owner, repo, use_https=True, user=None, password=None, bug_label_names=BUG_LABELS):
+        self.api_url = api_url
         self.owner = owner
         self.repo = repo
         self.use_https = use_https
@@ -24,9 +24,9 @@ class GitHub(object):
         return 'http://'
 
     def get_issue_url(self, number):
-        return '{protocol}{domain}/api/v3/repos/{owner}/{repo}/issues/{number}'.format(
+        return '{protocol}{domain}/repos/{owner}/{repo}/issues/{number}'.format(
             protocol=self.get_protocol_prefix(),
-            domain=self.domain,
+            domain=self.api_url,
             owner=self.owner,
             repo=self.repo,
             number=number
