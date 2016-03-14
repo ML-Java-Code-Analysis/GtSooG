@@ -11,20 +11,20 @@ LEVEL_DEBUG = 3
 default_mode = MODE_PRINT
 default_logfile = "log.txt"
 file_pointers = {}
-min_log_level = LEVEL_DEBUG
+max_log_level = LEVEL_DEBUG
 
 
 def set_min_log_level(level):
-    """ Sets the minimum level of logs which actually should be logged.
+    """ Sets the maximum level of logs which actually should be logged.
 
     Args:
         level (int): The log level. Use the LEVEL_X constants from this module.
     """
-    globals()['log_level'] = level
+    globals()['max_log_level'] = level
 
 
 def log(message, level, mode=default_mode, logfile=None):
-    """ Adds a new log entry. Entry will only be created if log level is equal or above minimum log level.
+    """ Adds a new log entry. Entry will only be created if log level is equal or above maximum log level.
 
     Args:
         message (str): The actual log message
@@ -32,7 +32,7 @@ def log(message, level, mode=default_mode, logfile=None):
         mode (int): Optional. The logging mode. Use the MODE_X constants from this module.
         logfile (str): Optional. The filepath, where this message should be logged to.
     """
-    if level < min_log_level:
+    if level > max_log_level:
         return None
 
     timestamp = datetime.now().strftime("%y.%m.%d-%H:%M:%S")
