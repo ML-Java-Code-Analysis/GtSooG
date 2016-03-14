@@ -1,11 +1,13 @@
 import os
 import threading
+import datetime
 
 from git import Repo
 
 from model import DB
 from model.objects.IssueTracking import IssueTracking
 from model.objects.Repository import Repository
+from model.objects.Commit import Commit
 from utils import Log
 
 
@@ -24,34 +26,34 @@ class RepositoryMiner(object):
         self.branch = branch
 
         # TODO das sollte parametrisierbar sein
-        self.NUMBER_OF_THREADS = 15
+        self.NUMBER_OF_THREADS = 0
         self.interesting_file_extensions = [".md", ".py", ".java"]
 
-        if name is None:
-            name = os.path.split(repository_url)[1]
-
-        # Try to retrieve the repository record, if not found a new one is created.
-        self.repository_orm = self.db_session.query(Repository).filter(Repository.name == name).one()
-        if not self.repository_orm:
-            self.__create_new_repository(name, repository_url)
+        self.__create_new_repository(name, repository_url)
 
         commits = self.get_commits()
         self.iterate_commits(commits)
 
     def __create_new_repository(self, name, repository_url):
-        self.repository_orm = Repository(
-            name=name,
-            url=repository_url
-        )
-        # TODO: get issue tracking via params
-        self.issue_tracking_orm = IssueTracking(
-            repository_id=self.repository_orm.id,
-            type='JIRA',
-            url='www.penisland.net'
-        )
-        self.db_session.add(self.repository_orm)
-        self.db_session.add(self.issue_tracking_orm)
-        self.db_session.commit()
+        # Try to retrieve the repository record, if not found a new one is created.
+        if name is None:
+            name = os.path.split(repository_url)[1]
+
+        self.repository_orm = self.db_session.query(Repository).filter(Repository.name == name).one_or_none()
+        if not self.repository_orm:
+            self.repository_orm = Repository(
+                name=name,
+                url=repository_url
+            )
+            # TODO: get issue tracking via params
+            self.issue_tracking_orm = IssueTracking(
+                repository_id=self.repository_orm.id,
+                type='JIRA',
+                url='www.penisland.net'
+            )
+            self.db_session.add(self.repository_orm)
+            self.db_session.add(self.issue_tracking_orm)
+            self.db_session.commit()
 
     def iterate_commits(self, commits):
         """
@@ -98,8 +100,10 @@ class RepositoryMiner(object):
         changed_files = manipulated_files[2]
         files_diff = manipulated_files[3]
 
+        commit_time = datetime.datetime.utcfromtimestamp(commit.committed_date)
+
         Log.log("------------", Log.LEVEL_DEBUG)
-        Log.log("Commit: " + commit.message, Log.LEVEL_DEBUG)
+        Log.log("Commit: " + commit.message + "with ID: " + str(commit) + "Commit date: " + str(commit_time), Log.LEVEL_DEBUG)
         Log.log("Added: " + str([file.path for file in added_files]), Log.LEVEL_DEBUG)
         Log.log("Deleted: " + str([file.path for file in deleted_files]), Log.LEVEL_DEBUG)
         Log.log("Changed: " + str([file.path for file in changed_files]), Log.LEVEL_DEBUG)
@@ -109,6 +113,20 @@ class RepositoryMiner(object):
         #     # Log.log("Changed: " + str(file),Log.LEVEL_DEBUG)
         #     filename = re.search(r"\/.*\\n", str(file))
         #     print(str(filename.group(0)))
+
+        self.__create_new_commit(str(commit),commit.message,commit_time)
+
+    def __create_new_commit(self, id, message, timestamp):
+        # Try to retrieve the commit record, if not found a new one is created.
+        self.commit_orm = self.db_session.query(Commit).filter(Commit.id == id).one_or_none()
+        if not self.commit_orm:
+            self.commit_orm = Commit(
+                id=id,
+                message=message,
+                timestamp=timestamp
+            )
+            self.db_session.add(self.commit_orm)
+            self.db_session.commit()
 
     def get_commits(self):
         """

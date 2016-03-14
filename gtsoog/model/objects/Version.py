@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer
+from sqlalchemy import Column, Integer, String
 from sqlalchemy.sql.schema import ForeignKey
 
 from model.objects.Base import Base
@@ -11,7 +11,7 @@ class Version(Base):
 
     id = Column(Integer, primary_key=True)
     file_id = Column(Integer, ForeignKey("file.id"))
-    commit_id = Column(Integer, ForeignKey("commit.id"))
+    commit_id = Column(String, ForeignKey("commit.id"))
     lines_changed = Column(Integer, nullable=False)
     lines_added = Column(Integer, nullable=False)
     lines_deleted = Column(Integer, nullable=False)

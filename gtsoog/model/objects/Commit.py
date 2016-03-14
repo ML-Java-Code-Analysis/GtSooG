@@ -9,7 +9,7 @@ Base = Base().base
 class Commit(Base):
     __tablename__ = 'commit'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String, primary_key=True)
     repository_id = Column(Integer, ForeignKey('repository.id'))
     message = Column(String, nullable=False)
     timestamp = Column(DateTime, nullable=False)
