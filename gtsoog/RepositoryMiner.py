@@ -1,19 +1,19 @@
 from git import Repo
 from gtsoog import Log
 import threading
+import re
+
 
 class RepositoryMiner(object):
-
     def __init__(self, repository_url, branch='master'):
         self.repository = Repo(repository_url)
         self.branch = branch
 
-        self.NUMBER_OF_THREADS = 0
-        self.interesting_file_extensions = [".md",".py",".java"]
+        self.NUMBER_OF_THREADS = 15
+        self.interesting_file_extensions = [".md", ".py", ".java"]
 
         commits = self.get_commits()
         self.iterate_commits(commits)
-
 
     def iterate_commits(self, commits):
 
@@ -25,25 +25,23 @@ class RepositoryMiner(object):
         previous_commit = None
 
         threads = []
-        commit_counter=0
+        commit_counter = 0
 
         for commit in commits:
-            commit_counter+=1
+            commit_counter += 1
             if commit_counter % 1000 == 0:
-                Log.log("Commit counter: " + str(commit_counter),Log.LEVEL_DEBUG)
+                Log.log("Commit counter: " + str(commit_counter), Log.LEVEL_DEBUG)
 
             if commit.parents:
                 previous_commit = commit.parents[0]
 
             if len(commit.parents) <= 1:
                 if threading.active_count() < self.NUMBER_OF_THREADS:
-                    t = threading.Thread(target=self.process_commit, args=(commit,previous_commit,))
+                    t = threading.Thread(target=self.process_commit, args=(commit, previous_commit,))
                     threads.append(t)
                     t.start()
                 else:
                     self.process_commit(commit, previous_commit)
-
-
 
     def process_commit(self, commit, previous_commit):
         """
@@ -62,43 +60,19 @@ class RepositoryMiner(object):
         changed_files = manipulated_files[2]
         files_diff = manipulated_files[3]
 
-        Log.log("------------",Log.LEVEL_DEBUG)
-        Log.log("Commit: " + commit.message,Log.LEVEL_DEBUG)
-        Log.log("Added: " + str([file.path for file in added_files]),Log.LEVEL_DEBUG)
-        Log.log("Deleted: " + str([file.path for file in deleted_files]),Log.LEVEL_DEBUG)
-        Log.log("Changed: " + str([file.path for file in changed_files]),Log.LEVEL_DEBUG)
+        Log.log("------------", Log.LEVEL_DEBUG)
+        Log.log("Commit: " + commit.message, Log.LEVEL_DEBUG)
+        Log.log("Added: " + str([file.path for file in added_files]), Log.LEVEL_DEBUG)
+        Log.log("Deleted: " + str([file.path for file in deleted_files]), Log.LEVEL_DEBUG)
+        Log.log("Changed: " + str([file.path for file in changed_files]), Log.LEVEL_DEBUG)
 
-        Log.log("Diff: " + str(files_diff),Log.LEVEL_DEBUG)
-
+        Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
+        for file in files_diff:
+            # Log.log("Changed: " + str(file),Log.LEVEL_DEBUG)
+            filename = re.search(r"\/.*\\n", str(file))
+            print(str(filename.group(0)))
 
         return
-        """ old stuff for getting file content """
-        #Log.log("Added: " + str([file.path for file in added_files]),Log.LEVEL_DEBUG)
-        # if added_files:
-        #      for file in added_files:
-        #          Log.log("File: " + str(file.path),Log.LEVEL_DEBUG)
-        #
-        #          if (any(file.path.rsplit(".")[-1] in s for s in self.interesting_file_extensions)) and (file.data_stream.read()):
-        #              Log.log(str( file.data_stream.read().decode('utf8',"ignore") ),Log.LEVEL_DEBUG)
-        #
-        #  Log.log("Deleted: " + str([file.path for file in deleted_files]),Log.LEVEL_DEBUG)
-        #
-        #  if deleted_files:
-        #      for file in deleted_files:
-        #          Log.log("File: " + str(file.path),Log.LEVEL_DEBUG)
-        #
-        #          if (any(file.path.rsplit(".")[-1] in s for s in self.interesting_file_extensions)) and (file.data_stream.read()):
-        #              Log.log(str( file.data_stream.read().decode('utf8',"ignore") ),Log.LEVEL_DEBUG)
-        #
-        #  Log.log("Changed: " + str([file.path for file in changed_files]),Log.LEVEL_DEBUG)
-        #
-        #
-        #  if changed_files:
-        #      for file in changed_files:
-        #          Log.log("File: " + str(file.path),Log.LEVEL_DEBUG)
-        #
-        #          if (any(file.path.rsplit(".")[-1] in s for s in self.interesting_file_extensions)) and (file.data_stream.read()):
-        #              Log.log(str( file.data_stream.read().decode('utf8',"ignore") ),Log.LEVEL_DEBUG)
 
     def get_commits(self):
         """
@@ -148,15 +122,14 @@ class RepositoryMiner(object):
         for item in diff_with_patch:
             files_diff.append(item.diff)
 
-        #for diff_added in diff_with_patch.iter_change_type('A'):
-            #print(diff_added)
+            # for diff_added in diff_with_patch.iter_change_type('A'):
+            # print(diff_added)
+            # for diff_changed in diff_with_patch.iter_change_type('M'):
+            # print(diff_changed)
 
         """ handle first commit"""
         if previous_commit is None:
             added_files = deleted_files
             deleted_files = []
 
-        return added_files,deleted_files,changed_files,files_diff
-
-    def stats(repository_path, branch='master'):
-        print("mine mine\n")
+        return added_files, deleted_files, changed_files, files_diff
