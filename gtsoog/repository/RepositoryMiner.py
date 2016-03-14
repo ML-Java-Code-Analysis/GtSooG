@@ -11,19 +11,39 @@ from utils import Log
 
 class RepositoryMiner(object):
     def __init__(self, repository_url, name=None, branch='master'):
+        """ Initialize the Repository Miner
+
+        Args:
+            repository_url: The url to the repository
+            name: Optional. The unique name of this repository. Defaults to the last part of the path.
+            branch: Optional. The branch to mine. Defaults to the master branch.
+        """
+        # TODO wäre repository_url nicht der Filepfad?
         self.db_session = DB.create_session()
         self.repository = Repo(repository_url)
         self.branch = branch
 
+        # TODO das sollte parametrisierbar sein
         self.NUMBER_OF_THREADS = 15
         self.interesting_file_extensions = [".md", ".py", ".java"]
 
         if name is None:
             name = os.path.split(repository_url)[1]
+
+        # Try to retrieve the repository record, if not found a new one is created.
+        self.repository_orm = self.db_session.query(Repository).filter(Repository.name == name).one()
+        if not self.repository_orm:
+            self.__create_new_repository(name, repository_url)
+
+        commits = self.get_commits()
+        self.iterate_commits(commits)
+
+    def __create_new_repository(self, name, repository_url):
         self.repository_orm = Repository(
             name=name,
             url=repository_url
         )
+        # TODO: get issue tracking via params
         self.issue_tracking_orm = IssueTracking(
             repository_id=self.repository_orm.id,
             type='JIRA',
@@ -32,9 +52,6 @@ class RepositoryMiner(object):
         self.db_session.add(self.repository_orm)
         self.db_session.add(self.issue_tracking_orm)
         self.db_session.commit()
-
-        commits = self.get_commits()
-        self.iterate_commits(commits)
 
     def iterate_commits(self, commits):
         """
@@ -92,8 +109,6 @@ class RepositoryMiner(object):
         #     # Log.log("Changed: " + str(file),Log.LEVEL_DEBUG)
         #     filename = re.search(r"\/.*\\n", str(file))
         #     print(str(filename.group(0)))
-
-        return
 
     def get_commits(self):
         """
