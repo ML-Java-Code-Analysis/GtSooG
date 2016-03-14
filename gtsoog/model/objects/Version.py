@@ -1,18 +1,17 @@
-from model.objects.File import File
-from model.objects.Commit import Commit
 from sqlalchemy import Column, Integer
-from sqlalchemy.orm import relationship
+from sqlalchemy.sql.schema import ForeignKey
+
 from model.objects.Base import Base
 
 Base = Base().base
 
 
 class Version(Base):
-    __tablename__ = 'Version'
+    __tablename__ = 'version'
 
     id = Column(Integer, primary_key=True)
-    file = relationship(File)
-    commit = relationship(Commit)
+    file_id = Column(Integer, ForeignKey("file.id"))
+    commit_id = Column(Integer, ForeignKey("commit.id"))
     lines_changed = Column(Integer, nullable=False)
     lines_added = Column(Integer, nullable=False)
     lines_deleted = Column(Integer, nullable=False)

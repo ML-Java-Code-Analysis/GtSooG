@@ -1,14 +1,12 @@
-# Hauptfile, dieses ruft man dann auf
+from model import DB
 from repository.RepositoryMiner import RepositoryMiner
 
 
 def main():
-    #REPO_PATH = "P:\Studium\FS2016\BA\GitHubProjects\liferay-portal"
-    #GitCollector.collectData(REPO_PATH)
-    #GitStatistics.stats(REPO_PATH)
+    DB.create_db()
+    repository_url = r"C:\Users\ymeke\PycharmProjects\LED-Cube-Prototyper"
 
+    RepositoryMiner(repository_url)
 
-    RepositoryMiner(r"P:\Studium\FS2016\BA\GitHubProjects\LED-Cube-Prototyper")
-    #RepositoryMiner(r"P:\Studium\FS2016\BA\GitHubProjects\liferay-portal")
 
 main()

@@ -1,29 +1,48 @@
-import re
+import os
 import threading
 
 from git import Repo
 
+from model import DB
+from model.objects.IssueTracking import IssueTracking
+from model.objects.Repository import Repository
 from utils import Log
 
 
 class RepositoryMiner(object):
-    def __init__(self, repository_url, branch='master'):
+    def __init__(self, repository_url, name=None, branch='master'):
+        self.db_session = DB.create_session()
         self.repository = Repo(repository_url)
         self.branch = branch
 
         self.NUMBER_OF_THREADS = 15
         self.interesting_file_extensions = [".md", ".py", ".java"]
 
+        if name is None:
+            name = os.path.split(repository_url)[1]
+        self.repository_orm = Repository(
+            name=name,
+            url=repository_url
+        )
+        self.issue_tracking_orm = IssueTracking(
+            repository_id=self.repository_orm.id,
+            type='JIRA',
+            url='www.penisland.net'
+        )
+        self.db_session.add(self.repository_orm)
+        self.db_session.add(self.issue_tracking_orm)
+        self.db_session.commit()
+
         commits = self.get_commits()
         self.iterate_commits(commits)
 
     def iterate_commits(self, commits):
-
         """
 
         Args:
             commits:
         """
+
         previous_commit = None
 
         threads = []
@@ -69,10 +88,10 @@ class RepositoryMiner(object):
         Log.log("Changed: " + str([file.path for file in changed_files]), Log.LEVEL_DEBUG)
 
         Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
-        for file in files_diff:
-            # Log.log("Changed: " + str(file),Log.LEVEL_DEBUG)
-            filename = re.search(r"\/.*\\n", str(file))
-            print(str(filename.group(0)))
+        # for file in files_diff:
+        #     # Log.log("Changed: " + str(file),Log.LEVEL_DEBUG)
+        #     filename = re.search(r"\/.*\\n", str(file))
+        #     print(str(filename.group(0)))
 
         return
 

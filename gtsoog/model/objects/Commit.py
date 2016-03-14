@@ -1,15 +1,15 @@
-from model.objects.Repository import Repository
+from sqlalchemy.sql.schema import ForeignKey
+
 from sqlalchemy import Column, String, Integer, DateTime
-from sqlalchemy.orm import relationship
 from model.objects.Base import Base
 
 Base = Base().base
 
 
 class Commit(Base):
-    __tablename__ = 'Commit'
+    __tablename__ = 'commit'
 
     id = Column(Integer, primary_key=True)
-    repository = relationship(Repository)
+    repository_id = Column(Integer, ForeignKey('repository.id'))
     message = Column(String, nullable=False)
     timestamp = Column(DateTime, nullable=False)

@@ -1,16 +1,15 @@
-from model.objects.Repository import Repository
-from model.objects.Commit import Commit
 from sqlalchemy import Column, String, Integer
-from sqlalchemy.orm import relationship
+from sqlalchemy.sql.schema import ForeignKey
+
 from model.objects.Base import Base
 
 Base = Base().base
 
 
 class Issue(Base):
-    __tablename__ = 'Issue'
+    __tablename__ = 'issue'
 
     id = Column(Integer, primary_key=True)
-    repository = relationship(Repository)
-    commit = relationship(Commit)
+    issue_tracking_id = Column(Integer, ForeignKey("issueTracking.id"))
+    # commit = relationship("Commit")
     type = Column(String, nullable=False)

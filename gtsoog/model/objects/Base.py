@@ -4,7 +4,7 @@ from utils.Borg import Borg
 
 
 class Base(Borg):
-    def __init__(self, ):
+    def __init__(self):
         Borg.__init__(self)
         if not hasattr(self, 'base'):
             self.base = declarative_base()
