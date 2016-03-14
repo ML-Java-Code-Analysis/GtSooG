@@ -1,6 +1,5 @@
 # Hauptfile, dieses ruft man dann auf
-from gtsoog import GitCollector
-from gtsoog.RepositoryMiner import RepositoryMiner
+from repository.RepositoryMiner import RepositoryMiner
 
 
 def main():

@@ -1,7 +1,9 @@
-from git import Repo
-from gtsoog import Log
-import threading
 import re
+import threading
+
+from git import Repo
+
+from utils import Log
 
 
 class RepositoryMiner(object):

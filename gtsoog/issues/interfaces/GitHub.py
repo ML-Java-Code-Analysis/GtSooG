@@ -2,7 +2,7 @@ from json.decoder import JSONDecodeError
 
 import requests
 
-import Log
+from utils import Log
 
 
 class GitHub(object):
