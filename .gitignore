@@ -1,4 +1,4 @@
 .idea/
 src/__pycache__/
 *.pyc
-gtsoog/my.db
+*.db

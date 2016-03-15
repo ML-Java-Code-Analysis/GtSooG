@@ -8,7 +8,7 @@ __engine = None
 def __get_engine():
     global __engine
     if __engine is None:
-        __engine = create_engine('sqlite:///my.db')
+        __engine = create_engine('sqlite:///gtsoog.db')
     return __engine
 
 
