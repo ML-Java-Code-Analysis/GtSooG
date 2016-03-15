@@ -16,3 +16,6 @@ class Version(Base):
     lines_added = Column(Integer, nullable=False)
     lines_deleted = Column(Integer, nullable=False)
     file_size = Column(Integer, nullable=False)
+    
+    def __init__(self):
+        super(Version, self).__init__()
