@@ -27,6 +27,7 @@ class RepositoryMiner(object):
 
         # TODO das sollte parametrisierbar sein
         self.NUMBER_OF_THREADS = 0
+        self.NUMBER_OF_DBSESSIONS = self.NUMBER_OF_THREADS
         self.interesting_file_extensions = [".md", ".py", ".java"]
 
         self.__create_new_repository(name, repository_url)
@@ -81,9 +82,17 @@ class RepositoryMiner(object):
                     threads.append(t)
                     t.start()
                 else:
-                    self.process_commit(commit, previous_commit)
+                    self.__process_commit(commit, previous_commit)
 
-    def process_commit(self, commit, previous_commit):
+    def __get_db_session(self):
+        sessions = {}
+        #if not sessions:
+            #for x in range(0,self.NUMBER_OF_DBSESSIONS):
+                #sess
+        #for session in sessions:
+            #session
+
+    def __process_commit(self, commit, previous_commit):
         """
 
         Args:
