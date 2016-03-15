@@ -21,20 +21,34 @@ class RepositoryMiner(object):
             branch: Optional. The branch to mine. Defaults to the master branch.
         """
         # TODO wäre repository_url nicht der Filepfad?
-        self.db_session = DB.create_session()
         self.repository = Repo(repository_url)
         self.branch = branch
 
         # TODO das sollte parametrisierbar sein
-        self.NUMBER_OF_THREADS = 0
-        self.NUMBER_OF_DBSESSIONS = self.NUMBER_OF_THREADS
         self.interesting_file_extensions = [".md", ".py", ".java"]
+        self.NUMBER_OF_THREADS = 5
+        self.NUMBER_OF_DBSESSIONS = 0 #self.NUMBER_OF_THREADS
+
+        self.init_db_sessions()
 
         self.existing_commit_ids = set()
         self.__create_new_repository(name, repository_url)
 
         commits = self.get_commits()
         self.iterate_commits(commits)
+
+        self.close_all_db_sessions()
+
+    def init_db_sessions(self):
+        self.db_session = DB.create_session()
+        self.thread_db_sessions = {}
+        for i in range(self.NUMBER_OF_DBSESSIONS):
+            self.thread_db_sessions[i] = (False, DB.create_session())
+
+    def close_all_db_sessions(self):
+        self.db_session.close()
+        for i in self.thread_db_sessions.keys():
+            self.thread_db_sessions[i][1].close()
 
     def __create_new_repository(self, name, repository_url):
         # Try to retrieve the repository record, if not found a new one is created.
@@ -89,21 +103,21 @@ class RepositoryMiner(object):
 
             if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
                 if threading.active_count() < self.NUMBER_OF_THREADS:
-                    t = threading.Thread(target=self.process_commit, args=(commit, previous_commit,))
+                    session = self.__get_db_session()
+                    t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit))
                     threads.append(t)
                     t.start()
                 else:
-                    self.__process_commit(commit, previous_commit)
+                    self.__process_commit(commit, previous_commit, db_session=self.db_session)
 
     def __get_db_session(self):
-        sessions = {}
-        #if not sessions:
-            #for x in range(0,self.NUMBER_OF_DBSESSIONS):
-                #sess
-        #for session in sessions:
-            #session
+        for i in range(self.NUMBER_OF_DBSESSIONS):
+            session_tuple = self.thread_db_sessions[i]
+            if not session_tuple[0]:
+                return session_tuple[1]
 
-    def __process_commit(self, commit, previous_commit):
+
+    def __process_commit(self, commit, previous_commit, db_session = None):
         """
 
         Args:
@@ -113,6 +127,8 @@ class RepositoryMiner(object):
         Returns:
 
         """
+        if not db_session:
+            db_session = DB.create_session()
         manipulated_files = self.get_changed_files(commit, previous_commit)
 
         added_files = manipulated_files[0]
@@ -134,19 +150,22 @@ class RepositoryMiner(object):
         #     filename = re.search(r"\/.*\\n", str(file))
         #     print(str(filename.group(0)))
 
-        self.__create_new_commit(str(commit),commit.message,commit_time)
+        self.__create_new_commit(db_session, str(commit),commit.message,commit_time)
 
-    def __create_new_commit(self, id, message, timestamp):
+        db_session.close()
+
+    def __create_new_commit(self, db_session, id, message, timestamp):
         # Try to retrieve the commit record, if not found a new one is created.
-        self.commit_orm = self.db_session.query(Commit).filter(Commit.id == id).one_or_none()
+        # TODO: Now that existing commits are skipped anyway, this query could be removed for performance
+        self.commit_orm = db_session.query(Commit).filter(Commit.id == id).one_or_none()
         if not self.commit_orm:
             self.commit_orm = Commit(
                 id=id,
                 message=message,
                 timestamp=timestamp
             )
-            self.db_session.add(self.commit_orm)
-            self.db_session.commit()
+            db_session.add(self.commit_orm)
+            db_session.commit()
 
     def get_commits(self):
         """
