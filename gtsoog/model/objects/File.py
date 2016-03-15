@@ -12,6 +12,3 @@ class File(Base):
     id = Column(Integer, primary_key=True)
     repository_id = Column(Integer, ForeignKey("repository.id"))
     language = Column(String, nullable=False)
-
-    def __init__(self):
-        super(File, self).__init__()

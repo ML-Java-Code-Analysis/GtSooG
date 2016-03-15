@@ -20,6 +20,3 @@ class Commit(Base):
     message = Column(String, nullable=False)
     timestamp = Column(DateTime, nullable=False)
     issues = relationship("Issue", secondary=association_table, back_populates="commits")
-
-    def __init__(self):
-        super(Commit, self).__init__()

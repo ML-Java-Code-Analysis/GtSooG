@@ -18,6 +18,3 @@ class IssueTracking(Base):
     url = Column(String, nullable=False)
     username = Column(String)
     password = Column(String)
-
-    def __init__(self):
-        super(IssueTracking, self).__init__()

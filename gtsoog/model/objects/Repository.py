@@ -16,6 +16,3 @@ class Repository(Base):
     issueTracking = relationship("IssueTracking", uselist=False, back_populates="repository")
     commits = relationship("Commit")
     files = relationship(File)
-    
-    def __init__(self):
-        super(Repository, self).__init__()

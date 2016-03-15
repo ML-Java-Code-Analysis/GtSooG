@@ -16,6 +16,3 @@ class Issue(Base):
     title = Column(String)
     commits = relationship("Commit", secondary=Commit.association_table, back_populates="issues")
     type = Column(String, nullable=False)
-
-    def __init__(self):
-        super(Issue, self).__init__()
