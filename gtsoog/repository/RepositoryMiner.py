@@ -30,6 +30,7 @@ class RepositoryMiner(object):
         self.NUMBER_OF_DBSESSIONS = self.NUMBER_OF_THREADS
         self.interesting_file_extensions = [".md", ".py", ".java"]
 
+        self.existing_commit_ids = set()
         self.__create_new_repository(name, repository_url)
 
         commits = self.get_commits()
@@ -42,6 +43,7 @@ class RepositoryMiner(object):
 
         self.repository_orm = self.db_session.query(Repository).filter(Repository.name == name).one_or_none()
         if not self.repository_orm:
+            # create new repository
             self.repository_orm = Repository(
                 name=name,
                 url=repository_url
@@ -55,6 +57,15 @@ class RepositoryMiner(object):
             self.db_session.add(self.repository_orm)
             self.db_session.add(self.issue_tracking_orm)
             self.db_session.commit()
+        else:
+            # read existing commit ids into memory
+            self.__read_existings_commit_ids(self.repository_orm.id)
+
+    def __read_existings_commit_ids(self, repository_id):
+        self.existing_commit_ids = set([t[0] for t in self.db_session.query(Commit.id).all()])
+
+    def commit_exists(self, commit_id):
+        return commit_id in self.existing_commit_ids
 
     def iterate_commits(self, commits):
         """
@@ -76,7 +87,7 @@ class RepositoryMiner(object):
             if commit.parents:
                 previous_commit = commit.parents[0]
 
-            if len(commit.parents) <= 1:
+            if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
                 if threading.active_count() < self.NUMBER_OF_THREADS:
                     t = threading.Thread(target=self.process_commit, args=(commit, previous_commit,))
                     threads.append(t)
