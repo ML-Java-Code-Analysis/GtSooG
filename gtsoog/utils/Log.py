@@ -52,6 +52,56 @@ def log(message, level, mode=default_mode, logfile=None):
         f.write(log_msg)
 
 
+def error(message, mode=default_mode, logfile=None):
+    """ Adds a new log entry with ERROR level.
+
+    Args:
+        message (str): The actual log message
+        mode (int): Optional. The logging mode. Use the MODE_X constants from this module.
+        logfile (str): Optional. The filepath, where this message should be logged to.
+    """
+    log(message, LEVEL_ERROR, mode=mode, logfile=logfile)
+
+
+def warning(message, mode=default_mode, logfile=None):
+    """ Adds a new log entry with WARNING level.
+
+    The message will only be logged if maximum log level is at least at WARNING.
+
+    Args:
+        message (str): The actual log message
+        mode (int): Optional. The logging mode. Use the MODE_X constants from this module.
+        logfile (str): Optional. The filepath, where this message should be logged to.
+    """
+    log(message, LEVEL_WARNING, mode=mode, logfile=logfile)
+
+
+def info(message, mode=default_mode, logfile=None):
+    """ Adds a new log entry with INFO level.
+
+    The message will only be logged if maximum log level is at least at INFO.
+
+    Args:
+        message (str): The actual log message
+        mode (int): Optional. The logging mode. Use the MODE_X constants from this module.
+        logfile (str): Optional. The filepath, where this message should be logged to.
+    """
+    log(message, LEVEL_INFO, mode=mode, logfile=logfile)
+
+
+def debug(message, mode=default_mode, logfile=None):
+    """ Adds a new log entry with DEBUG level.
+
+    The message will only be logged if maximum log level is at least at DEBUG.
+
+    Args:
+        message (str): The actual log message
+        mode (int): Optional. The logging mode. Use the MODE_X constants from this module.
+        logfile (str): Optional. The filepath, where this message should be logged to.
+    """
+    log(message, LEVEL_DEBUG, mode=mode, logfile=logfile)
+
+
 def get_level_string(level):
     if level == LEVEL_ERROR:
         return "Error"
