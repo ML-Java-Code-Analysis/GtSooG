@@ -1,6 +1,7 @@
 import os
 import threading
 import datetime
+import re
 
 from git import Repo
 
@@ -145,10 +146,61 @@ class RepositoryMiner(object):
         Log.log("Changed: " + str([file.path for file in changed_files]), Log.LEVEL_DEBUG)
 
         Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
-        # for file in files_diff:
-        #     # Log.log("Changed: " + str(file),Log.LEVEL_DEBUG)
-        #     filename = re.search(r"\/.*\\n", str(file))
-        #     print(str(filename.group(0)))
+        for diff_file in files_diff:
+
+            #ugly string parsing
+
+            #parse every line
+            diff_line = diff_file.split('\n')
+
+            #print(diff_line)
+            if len(diff_line) <= 1:
+                continue
+
+            #added file
+            if "--- /dev/null" in diff_line[0]:
+                filename = diff_line[1][6:]
+
+            #deleted file
+            elif "--- /dev/null" in diff_line[1]:
+                filename = diff_line[0][7:]
+
+            #skip binary files
+            elif "Binary files" in diff_line[0]:
+                continue
+
+            #handle first commit
+            elif "***FIRSTCOMMIT***" in diff_line[0]:
+                handle = "HANDLE ME"
+
+            #changed file
+            else:
+                filename = diff_line[0][6:]
+
+            #print(filename)
+
+            # Log.log("Changed: " + str(file),Log.LEVEL_DEBUG)
+
+            #filename = re.search(r"[a|b]\/.*\\n@@", str(file)
+            # Added files
+            #file_str = str(file)
+            #file_str.split('\n')
+            #print(file_str)
+            #for f in file_str:
+                #print(f)
+
+            #added_file = re.search(r"b\'\-\-\- \/dev\/null\\n\+\+\+ b/.*\\n@@", str(file))
+            # Deleted files
+            #deleted_file = re.search(r"b\"\-\-\- a\/.*\\n\+\+\+ \/dev\/null\\n@@", str(file))
+            #Changed files
+            #changed_file = re.search(r"b\'\-\-\- a\/.*\\n\+\+\+ b\/.*\\n@@ -", str(file))
+
+            #if added_file:
+                #print(str(added_file.group(0)))
+            #if deleted_file:
+                #print(str(deleted_file.group(0)))
+            #if changed_file:
+                #print(str(changed_file.group(0)))
 
         self.__create_new_commit(db_session, str(commit),commit.message,commit_time)
 
@@ -201,7 +253,7 @@ class RepositoryMiner(object):
             diff_with_patch = previous_commit.diff(commit, create_patch=True)
             diff = previous_commit.diff(commit)
         else:
-            diff_with_patch = commit.diff(None, create_patch=True)
+            diff_with_patch = commit.diff(None, staged=False, create_patch=True)
             diff = commit.diff(None)
 
         for item in diff:
@@ -213,10 +265,12 @@ class RepositoryMiner(object):
                 changed_files.append(item.a_blob)
 
         for item in diff_with_patch:
-            files_diff.append(item.diff)
+            if previous_commit is None:
+                files_diff.append("***FIRSTCOMMIT***");
+            files_diff.append(item.diff.decode("utf-8"))
 
-            # for diff_added in diff_with_patch.iter_change_type('A'):
-            # print(diff_added)
+        #for diff_added in diff_with_patch.iter_change_type('A'):
+            #files_diff.append(diff_added)
             # for diff_changed in diff_with_patch.iter_change_type('M'):
             # print(diff_changed)
 
