@@ -2,7 +2,7 @@ import re
 
 from sqlalchemy.orm.exc import NoResultFound
 
-from issues.interfaces import GitHub
+from issues.systems import GitHub
 from model import DB
 from model.objects.Issue import Issue
 from model.objects.IssueTracking import IssueTracking, TYPE_GITHUB
