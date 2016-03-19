@@ -6,7 +6,11 @@ from model.objects.Base import Base
 
 Base = Base().base
 
+TYPE_GITHUB = 'GITHUB'
+TYPE_JIRA = 'JIRA'
 
+
+# noinspection PyClassHasNoInit
 class IssueTracking(Base):
     __tablename__ = "issueTracking"
 

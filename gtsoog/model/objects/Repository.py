@@ -7,6 +7,7 @@ from model.objects.File import File
 Base = Base().base
 
 
+# noinspection PyClassHasNoInit
 class Repository(Base):
     __tablename__ = 'repository'
 
