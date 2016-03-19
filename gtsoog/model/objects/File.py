@@ -9,6 +9,6 @@ Base = Base().base
 class File(Base):
     __tablename__ = 'file'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String, primary_key=True)
     repository_id = Column(Integer, ForeignKey("repository.id"))
     language = Column(String, nullable=False)

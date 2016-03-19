@@ -10,7 +10,7 @@ class Version(Base):
     __tablename__ = 'version'
 
     id = Column(Integer, primary_key=True)
-    file_id = Column(Integer, ForeignKey("file.id"))
+    file_id = Column(String, ForeignKey("file.id"))
     commit_id = Column(String, ForeignKey("commit.id"))
     lines_changed = Column(Integer, nullable=False)
     lines_added = Column(Integer, nullable=False)
