@@ -28,7 +28,7 @@ class RepositoryMiner(object):
 
         # TODO das sollte parametrisierbar sein
         self.PROGRAMMING_LANGUAGES = [("README", "md"), ("Python", "py"), ("Java" ,"java")]
-        self.NUMBER_OF_THREADS = 5
+        self.NUMBER_OF_THREADS = 0
         self.NUMBER_OF_DBSESSIONS = 0
 
         self.init_db_sessions()
@@ -142,7 +142,8 @@ class RepositoryMiner(object):
         added_files = manipulated_files[0]
         deleted_files = manipulated_files[1]
         changed_files = manipulated_files[2]
-        files_diff = manipulated_files[3]
+        renamed_files = manipulated_files[3]
+        files_diff = manipulated_files[4]
 
         commit_time = datetime.datetime.utcfromtimestamp(commit.committed_date)
         commit_id = str(commit)
@@ -150,18 +151,18 @@ class RepositoryMiner(object):
         self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit_time)
 
 
-        Log.log("------------", Log.LEVEL_DEBUG)
-        Log.log("Commit: " + commit.message + "with ID: " + str(commit) + "Commit date: " + str(commit_time), Log.LEVEL_DEBUG)
-        Log.log("Added: " + str([file.path for file in added_files]), Log.LEVEL_DEBUG)
-        Log.log("Deleted: " + str([file.path for file in deleted_files]), Log.LEVEL_DEBUG)
-        Log.log("Changed: " + str([file.path for file in changed_files]), Log.LEVEL_DEBUG)
-        Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
+        #Log.log("------------", Log.LEVEL_DEBUG)
+        #Log.log("Commit: " + commit.message + "with ID: " + str(commit) + "Commit date: " + str(commit_time), Log.LEVEL_DEBUG)
+        #Log.log("Added: " + str([file.path for file in added_files]), Log.LEVEL_DEBUG)
+        #Log.log("Deleted: " + str([file.path for file in deleted_files]), Log.LEVEL_DEBUG)
+        #Log.log("Changed: " + str([file.path for file in changed_files]), Log.LEVEL_DEBUG)
+        #Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
 
         if added_files:
             for file in added_files:
+                commit_files_size[file.path] = file.size
                 programming_language = self.__get_programming_langunage(file.path)
                 self.__create_new_file(db_session,str(file.path), self.repository_id ,programming_language)
-                commit_files_size[file.path] = file.size
 
         if deleted_files:
             for file in deleted_files:
@@ -170,6 +171,14 @@ class RepositoryMiner(object):
         if changed_files:
             for file in changed_files:
                 commit_files_size[file.path] = file.size
+
+        # for renamed files just create a new one
+        # TODO handle file history
+        if renamed_files:
+            for file in renamed_files:
+                commit_files_size[file[1].path] = file[1].size
+                programming_language = self.__get_programming_langunage(file[1].path)
+                self.__create_new_file(db_session,str(file[1].path), self.repository_id ,programming_language)
 
         files_with_lines_metric = self.__get_lines_metric(files_diff)
         for file in files_with_lines_metric:
@@ -180,7 +189,7 @@ class RepositoryMiner(object):
     def __get_programming_langunage(self, path):
         splitted_path = path.split('.')
 
-        if splitted_path[1]:
+        if len(splitted_path) > 1:
             for language in self.PROGRAMMING_LANGUAGES:
                 if language[1] == splitted_path[1]:
                     return language[0]
@@ -217,12 +226,16 @@ class RepositoryMiner(object):
                 filename = diff_lines[1][6:]
 
             #deleted file
-            elif "--- /dev/null" in diff_lines[1]:
-                filename = diff_lines[0][7:]
+            elif "+++ /dev/null" in diff_lines[1]:
+                filename = diff_lines[0][6:]
 
-            #skip binary files
+            #skip binary file
             elif "Binary files" in diff_lines[0]:
                 continue
+
+            #renamed file
+            elif diff_lines[0][6:] != diff_lines[1][6:]:
+                filename = diff_lines[1][6:]
 
             #changed file
             else:
@@ -245,7 +258,7 @@ class RepositoryMiner(object):
 
             files_with_lines_metric.append((filename,changed_lines,added_lines,deleted_lines))
 
-            Log.log("File: " + filename + " changed lines " + str(changed_lines) + " added lines " + str(added_lines) + " deleted lines " + str(deleted_lines), Log.LEVEL_DEBUG)
+            #Log.log("File: " + filename + " changed lines " + str(changed_lines) + " added lines " + str(added_lines) + " deleted lines " + str(deleted_lines), Log.LEVEL_DEBUG)
 
         return files_with_lines_metric
 
@@ -313,6 +326,7 @@ class RepositoryMiner(object):
         added_files = []
         deleted_files = []
         changed_files = []
+        renamed_files = []
         files_diff = []
 
         """ do the diff for previous_commit
@@ -332,6 +346,8 @@ class RepositoryMiner(object):
                 deleted_files.append(item.a_blob)
             if (item.a_blob is not None) and (item.b_blob is not None) and (not item.renamed):
                 changed_files.append(item.a_blob)
+            if item.renamed:
+                renamed_files.append((item.a_blob,item.b_blob))
 
         for item in diff_with_patch:
             #mark first commit for later handeling
@@ -344,4 +360,4 @@ class RepositoryMiner(object):
             added_files = deleted_files
             deleted_files = []
 
-        return added_files, deleted_files, changed_files, files_diff
+        return added_files, deleted_files, changed_files, renamed_files, files_diff
