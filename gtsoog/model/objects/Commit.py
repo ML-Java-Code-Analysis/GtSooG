@@ -6,14 +6,14 @@ from model.objects.Base import Base
 Base = Base().base
 
 
+# noinspection PyClassHasNoInit
 class Commit(Base):
-
     __tablename__ = 'commit'
 
     association_table = Table('commit_issue', Base.metadata,
-        Column('commit_id', Integer, ForeignKey('commit.id')),
-        Column('issue_id', Integer, ForeignKey('issue.id'))
-    )
+                              Column('commit_id', Integer, ForeignKey('commit.id')),
+                              Column('issue_id', Integer, ForeignKey('issue.id'))
+                              )
 
     id = Column(String, primary_key=True)
     repository_id = Column(Integer, ForeignKey('repository.id'))

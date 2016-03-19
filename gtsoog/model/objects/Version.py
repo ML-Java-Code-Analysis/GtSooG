@@ -6,6 +6,7 @@ from model.objects.Base import Base
 Base = Base().base
 
 
+# noinspection PyClassHasNoInit
 class Version(Base):
     __tablename__ = 'version'
 
