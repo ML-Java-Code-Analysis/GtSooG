@@ -180,7 +180,7 @@ class RepositoryMiner(object):
                 commit_files_size[new_file.path] = new_file.size
                 programming_language = self.__get_programming_langunage(new_file.path)
                 #get the timestamp from old filename
-                old_timestamp = self.db_session.query(File).filter(File.name == str(old_file.path)).order_by(desc(File.timestamp)).one
+                old_timestamp = self.db_session.query(File).filter(File.id == str(old_file.path)).order_by(desc(File.timestamp)).one
                 self.__create_new_file(db_session, str(new_file.path), commit_time, self.repository_id, programming_language, str(old_file.path), old_timestamp)
 
         files_with_lines_metric = self.__get_lines_metric(files_diff)
