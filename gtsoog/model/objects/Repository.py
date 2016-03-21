@@ -2,7 +2,6 @@ from sqlalchemy import Column, String, Integer
 from sqlalchemy.orm import relationship
 
 from model.objects.Base import Base
-from model.objects.File import File
 
 Base = Base().base
 
@@ -16,4 +15,4 @@ class Repository(Base):
     url = Column(String)
     issueTracking = relationship("IssueTracking", uselist=False, back_populates="repository")
     commits = relationship("Commit")
-    files = relationship(File)
+    files = relationship("File")

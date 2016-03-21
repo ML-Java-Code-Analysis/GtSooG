@@ -26,7 +26,7 @@ from repository.RepositoryMiner import RepositoryMiner
 def main():
     DB.create_db()
     #repository_url = r"P:\Studium\FS2016\BA\GitHubProjects\LED-Cube-Prototyper"
-    repository_url = r"P:\Studium\FS2016\BA\GitHubProjects\guava"
+    repository_url = r"P:\Studium\FS2016\BA\GitHubProjects\liferay-portal"
 
     RepositoryMiner(repository_url)
 
