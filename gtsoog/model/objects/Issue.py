@@ -16,8 +16,8 @@ TYPE_OTHER = 'OTHER'
 class Issue(Base):
     __tablename__ = 'issue'
 
-    id = Column(String, primary_key=True)
-    issue_tracking_id = Column(Integer, ForeignKey("issueTracking.id"), primary_key=True)
-    title = Column(String)
+    id = Column(Integer, primary_key=True)
+    issue_tracking_id = Column(Integer, ForeignKey("issueTracking.id"))
+    title = Column(String(500))
     commits = relationship("Commit", secondary=Commit.association_table, back_populates="issues")
-    type = Column(String, nullable=False)
+    type = Column(String(20), nullable=False)

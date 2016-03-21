@@ -70,13 +70,6 @@ class RepositoryMiner(object):
             self.db_session.flush()
             self.db_session.commit()
 
-            # TODO: get issue tracking via params
-            self.issue_tracking_orm = IssueTracking(
-                repository_id=self.repository_orm.id,
-                type='JIRA',
-                url='www.sampleurl.com'
-            )
-
             self.db_session.add(self.issue_tracking_orm)
             self.db_session.commit()
         else:
