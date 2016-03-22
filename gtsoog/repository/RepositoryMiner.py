@@ -69,9 +69,6 @@ class RepositoryMiner(object):
             self.db_session.add(self.repository_orm)
             self.db_session.flush()
             self.db_session.commit()
-
-            self.db_session.add(self.issue_tracking_orm)
-            self.db_session.commit()
         else:
             # read existing commit ids into memory
             self.__read_existings_commit_ids(self.repository_orm.id)
@@ -180,7 +177,7 @@ class RepositoryMiner(object):
                 commit_files_size[new_file.path] = new_file.size
                 programming_language = self.__get_programming_langunage(new_file.path)
                 #get the timestamp from old filename
-                old_timestamp = self.db_session.query(File).filter(File.id == str(old_file.path)).order_by(desc(File.timestamp)).one
+                old_timestamp = self.db_session.query(File).filter(File.id == str(old_file.path)).order_by(desc(File.timestamp)).first().timestamp
                 self.__create_new_file(db_session, str(new_file.path), commit_time, self.repository_id, programming_language, str(old_file.path), old_timestamp)
 
         files_with_lines_metric = self.__get_lines_metric(files_diff)
@@ -189,8 +186,11 @@ class RepositoryMiner(object):
                 self.__create_new_version(db_session, file[0], commit_id, file[1], file[2], file[3],
                                           commit_files_size[file[0]])
             except KeyError:
-                Log.log("f1: " + str(file[0]) + " f2: " + str(file[1]), Log.LEVEL_DEBUG)
-                Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
+                # in diff there was a difference found. But github commit comparision didn't found a change (addded, deleted, changed or renamed file)
+                # At the moment we just ignore this
+                pass
+                #Log.log("f1: " + str(file[0]) + " f2: " + str(file[1]), Log.LEVEL_DEBUG)
+                #Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
 
         db_session.close()
 
@@ -244,9 +244,9 @@ class RepositoryMiner(object):
             elif diff_lines[0][6:] != diff_lines[1][6:]:
                 filename = diff_lines[1][6:]
 
-            # renamed file 2
+            # renamed file 2. Not realy recognized as rename by git. Don't know what to do with that...
             elif "similarity index 100%" in diff_lines[0]:
-                filename = diff_lines[10][6:]
+                filename = diff_lines[1][12:]
 
             # changed file
             else:

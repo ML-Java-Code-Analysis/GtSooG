@@ -11,7 +11,7 @@ DIALECT_POSTGRES = 'postgresql'
 
 
 # TODO: make configurable
-def __get_engine(db_dialect=DIALECT_POSTGRES, db_name='gtsoog', user='postgres', password='root', host='localhost', port=5432):
+def __get_engine(db_dialect=DIALECT_SQLITE, db_name='gtsoog', user='postgres', password='root', host='localhost', port=5432):
     global __engine
     auth_string = ""
     if user:
