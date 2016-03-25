@@ -5,7 +5,7 @@ import datetime
 from git import Repo
 
 from model import DB
-from model.objects.IssueTracking import IssueTracking
+from model.objects.Line import Line, TYPE_ADDED, TYPE_DELETED
 from model.objects.Repository import Repository
 from model.objects.Commit import Commit
 from model.objects.File import File
@@ -31,7 +31,6 @@ class RepositoryMiner(object):
         self.PROGRAMMING_LANGUAGES = Config.programming_languages
         self.NUMBER_OF_THREADS = Config.number_of_database_sessions
         self.NUMBER_OF_DBSESSIONS = Config.number_of_threads
-        print(self.NUMBER_OF_DBSESSIONS)
 
         self.db_session = None
         self.thread_db_sessions = {}
@@ -142,6 +141,7 @@ class RepositoryMiner(object):
             return
 
         commit_time = datetime.datetime.utcfromtimestamp(commit.committed_date)
+        timestamp = commit_time
         commit_id = str(commit)
         commit_files_size = {}
 
@@ -158,7 +158,8 @@ class RepositoryMiner(object):
             for file in added_files:
                 commit_files_size[file.path] = file.size
                 programming_language = self.__get_programming_langunage(file.path)
-                self.__create_new_file(db_session, str(file.path), commit_time, self.repository_id, programming_language)
+                self.__create_new_file(db_session, str(file.path), commit_time, self.repository_id,
+                                       programming_language)
 
         if deleted_files:
             for file in deleted_files:
@@ -177,21 +178,13 @@ class RepositoryMiner(object):
 
                 commit_files_size[new_file.path] = new_file.size
                 programming_language = self.__get_programming_langunage(new_file.path)
-                #get the timestamp from old filename
-                old_timestamp = self.db_session.query(File).filter(File.id == str(old_file.path)).order_by(desc(File.timestamp)).first().timestamp
-                self.__create_new_file(db_session, str(new_file.path), commit_time, self.repository_id, programming_language, str(old_file.path), old_timestamp)
+                # get the timestamp from old filename
+                old_timestamp = self.db_session.query(File).filter(File.id == str(old_file.path)).order_by(
+                    desc(File.timestamp)).first().timestamp
+                self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
+                                       programming_language, str(old_file.path), old_timestamp)
 
-        files_with_lines_metric = self.__get_lines_metric(files_diff)
-        for file in files_with_lines_metric:
-            try:
-                self.__create_new_version(db_session, file[0], commit_id, file[1], file[2], file[3],
-                                          commit_files_size[file[0]])
-            except KeyError:
-                # in diff there was a difference found. But github commit comparision didn't found a change (added, deleted, changed or renamed file)
-                # At the moment we just ignore this
-                pass
-                #Log.log("f1: " + str(file[0]) + " f2: " + str(file[1]), Log.LEVEL_DEBUG)
-                #Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
+        self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
 
         db_session.close()
 
@@ -204,7 +197,7 @@ class RepositoryMiner(object):
                     return language[0]
         return "NOT_FOUND"
 
-    def __get_lines_metric(self, files_diff):
+    def __process_version(self, db_session, files_diff, timestamp, commit_id, commit_files_size):
         # diff string parsing copy pasta, spaghetti
 
         files_with_lines_metric = []
@@ -253,26 +246,59 @@ class RepositoryMiner(object):
             else:
                 filename = diff_lines[0][6:]
 
+            # add the version
+            try:
+                version = self.__create_new_version(db_session, filename, timestamp, commit_id, 0, 0,
+                                                    commit_files_size[filename])
+            except KeyError:
+                # in diff there was a difference found. But github commit comparision didn't found a change (added, deleted, changed or renamed file)
+                # At the moment we just ignore this
+                continue
+
+            added_lines_counter = 0
+            deleted_lines_counter = 0
+
             for diff_line in diff_lines[2:]:
+                # get information about line number
+                if (diff_line.startswith('@@', 0, 2)):
+                    deleted_lines_counter = int(diff_line[4:].split(',')[0]) - 1
+                    deleted_lines_count = int(diff_line[4:].split(',')[1].split(' ')[0])
+
+                    added_lines_counter = int(diff_line.split('+')[1].split(',')[0]) - 1
+                    added_lines_count = int(diff_line.split('+')[1].split(',')[1].split(' ')[0])
+
                 if diff_line.startswith('+', 0, 1):
+                    self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
                     added_lines += 1
+                    deleted_lines_counter -= 1
+
                 if diff_line.startswith('-', 0, 1):
-                    deleted_lines += 1
+                    # first commit deleted lines = added lines
+                    if first_commit:
+                        self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
+                        added_lines += 1
+                        deleted_lines_counter -= 1
+                    else:
+                        self.__create_new_line(db_session, diff_line[1:], deleted_lines_counter, TYPE_DELETED, version.id)
+                        deleted_lines += 1
+                        added_lines_counter -= 1
 
-            # handle first commit
-            if first_commit:
-                if added_lines > 0:
-                    continue
-                added_lines = deleted_lines
-                deleted_lines = 0
+                added_lines_counter += 1
+                deleted_lines_counter += 1
 
-            changed_lines = added_lines + deleted_lines
+            version.lines_added = added_lines
+            version.lines_deleted = deleted_lines
+            db_session.commit()
 
-            files_with_lines_metric.append((filename, changed_lines, added_lines, deleted_lines))
-
-            # Log.log("File: " + filename + " changed lines " + str(changed_lines) + " added lines " + str(added_lines) + " deleted lines " + str(deleted_lines), Log.LEVEL_DEBUG)
-
-        return files_with_lines_metric
+    def __create_new_line(self, db_session, line, line_number, type, version_id):
+        self.line_orm = Line(
+            line=line,
+            line_number=line_number,
+            type=type,
+            version_id=version_id
+        )
+        db_session.add(self.line_orm)
+        db_session.commit()
 
     def __create_new_commit(self, db_session, commit_id, repository_id, message, timestamp):
         # Try to retrieve the commit record, if not found a new one is created.
@@ -288,7 +314,8 @@ class RepositoryMiner(object):
             db_session.add(self.commit_orm)
             db_session.commit()
 
-    def __create_new_file(self, db_session, file_id, timestamp, repository_id, language ,precursor_file_id=None, precursor_file_timestamp=None):
+    def __create_new_file(self, db_session, file_id, timestamp, repository_id, language, precursor_file_id=None,
+                          precursor_file_timestamp=None):
         # Try to retrieve the file record, if not found a new one is created.
         self.file_orm = db_session.query(File).filter(File.id == file_id, File.timestamp == timestamp).one_or_none()
         if not self.file_orm:
@@ -303,18 +330,20 @@ class RepositoryMiner(object):
             db_session.add(self.file_orm)
             db_session.commit()
 
-    def __create_new_version(self, db_session, file_id, commit_id, lines_changed, lines_added, lines_deleted,
+    def __create_new_version(self, db_session, file_id, file_timestamp, commit_id, lines_added,
+                             lines_deleted,
                              file_size):
         self.version_orm = Version(
             file_id=file_id,
+            file_timestamp=file_timestamp,
             commit_id=commit_id,
-            lines_changed=lines_changed,
             lines_added=lines_added,
             lines_deleted=lines_deleted,
             file_size=file_size
         )
         db_session.add(self.version_orm)
         db_session.commit()
+        return self.version_orm
 
     def get_commits(self):
         """

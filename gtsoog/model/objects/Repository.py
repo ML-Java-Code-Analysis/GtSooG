@@ -5,7 +5,6 @@ from model.objects.Base import Base
 
 Base = Base().base
 
-
 # noinspection PyClassHasNoInit
 class Repository(Base):
     __tablename__ = 'repository'

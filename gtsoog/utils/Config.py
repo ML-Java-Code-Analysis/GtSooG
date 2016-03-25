@@ -2,8 +2,7 @@ import argparse
 import configparser
 from model.objects import IssueTracking
 
-#Config Parameters
-
+#Config parameters
 repository_path = None
 issue_tracking_system = None
 issue_tracking_url = None
@@ -25,7 +24,7 @@ DIALECT_POSTGRES = 'postgresql'
 def argument_parser():
     parser = argparse.ArgumentParser(description='GtSoog - git data miner')
 
-    #CLI Parameters
+    #CLI parameters
     parser.add_argument('-f', action="store", required=True, dest="config_file", help='Specify config file')
 
     args = parser.parse_args()
@@ -39,6 +38,7 @@ def config_parser(config_file):
         config = configparser.ConfigParser()
         config.read(config_file)
 
+        #Config parameters
         try:
             global programming_languages
             for item in config.items('PROGRAMMINGLANGUAGES'):

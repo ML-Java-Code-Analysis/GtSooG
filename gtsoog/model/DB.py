@@ -60,6 +60,7 @@ def create_db():
     from model.objects.File import File
     from model.objects.Issue import Issue
     from model.objects.Version import Version
+    from model.objects.Line import Line
 
     engine = __get_engine()
     if engine is None:
