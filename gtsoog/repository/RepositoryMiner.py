@@ -12,32 +12,33 @@ from model.objects.File import File
 from model.objects.Version import Version
 from utils import Log
 from sqlalchemy import desc
+from utils import Config
 
 
 class RepositoryMiner(object):
-    def __init__(self, repository_url, name=None, branch='master'):
+    def __init__(self, repository_path, name=None, branch='master'):
         """ Initialize the Repository Miner
 
         Args:
-            repository_url: The url to the repository
+            repository_path: The url to the repository
             name: Optional. The unique name of this repository. Defaults to the last part of the path.
             branch: Optional. The branch to mine. Defaults to the master branch.
         """
         # TODO wäre repository_url nicht der Filepfad?
-        self.repository = Repo(repository_url)
+        self.repository = Repo(repository_path)
         self.branch = branch
 
-        # TODO das sollte parametrisierbar sein
-        self.PROGRAMMING_LANGUAGES = [("README", "md"), ("Python", "py"), ("Java", "java")]
-        self.NUMBER_OF_THREADS = 0
-        self.NUMBER_OF_DBSESSIONS = 0
+        self.PROGRAMMING_LANGUAGES = Config.programming_languages
+        self.NUMBER_OF_THREADS = Config.number_of_database_sessions
+        self.NUMBER_OF_DBSESSIONS = Config.number_of_threads
+        print(self.NUMBER_OF_DBSESSIONS)
 
         self.db_session = None
-        self.init_db_sessions()
         self.thread_db_sessions = {}
+        self.init_db_sessions()
 
         self.existing_commit_ids = set()
-        self.repository_id = self.__create_new_repository(name, repository_url)
+        self.repository_id = self.__create_new_repository(name, repository_path)
 
         commits = self.get_commits()
         self.iterate_commits(commits)
@@ -186,7 +187,7 @@ class RepositoryMiner(object):
                 self.__create_new_version(db_session, file[0], commit_id, file[1], file[2], file[3],
                                           commit_files_size[file[0]])
             except KeyError:
-                # in diff there was a difference found. But github commit comparision didn't found a change (addded, deleted, changed or renamed file)
+                # in diff there was a difference found. But github commit comparision didn't found a change (added, deleted, changed or renamed file)
                 # At the moment we just ignore this
                 pass
                 #Log.log("f1: " + str(file[0]) + " f2: " + str(file[1]), Log.LEVEL_DEBUG)

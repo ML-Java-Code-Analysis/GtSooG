@@ -66,12 +66,12 @@ def main():
     Config.argument_parser()
 
     DB.create_db()
-    miner = RepositoryMiner(Config.repository_url)
+    miner = RepositoryMiner(Config.repository_path)
 
     assign_issue_tracking(
         1,
-        str(TYPE_GITHUB),
-        "github.engineering.zhaw.ch/api/v3/repos/mekesyac/LED-Cube-Prototyper"
+        Config.issue_tracking_system,
+        Config.issue_tracking_url
     )
     IssueScanner.scan_for_repository(1)
 
