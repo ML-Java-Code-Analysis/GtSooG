@@ -65,7 +65,9 @@ def assign_issue_tracking(repository_id, issue_tracking_type, url, username=None
 def main():
     Config.argument_parser()
 
+    Log.info("Started. Creating database")
     DB.create_db()
+
     miner = RepositoryMiner(Config.repository_path)
 
     assign_issue_tracking(

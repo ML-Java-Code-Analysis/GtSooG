@@ -24,7 +24,7 @@ class RepositoryMiner(object):
             name: Optional. The unique name of this repository. Defaults to the last part of the path.
             branch: Optional. The branch to mine. Defaults to the master branch.
         """
-        # TODO wäre repository_url nicht der Filepfad?
+
         self.repository = Repo(repository_path)
         self.branch = branch
 
@@ -39,6 +39,7 @@ class RepositoryMiner(object):
         self.existing_commit_ids = set()
         self.repository_id = self.__create_new_repository(name, repository_path)
 
+        Log.info("Start mining the repository with path: " + repository_path)
         commits = self.get_commits()
         self.iterate_commits(commits)
 
@@ -96,8 +97,15 @@ class RepositoryMiner(object):
 
         for commit in commits:
             commit_counter += 1
-            if commit_counter % 1000 == 0:
-                Log.log("Commit counter: " + str(commit_counter), Log.LEVEL_DEBUG)
+            if round((len(commits)/100)) < 1:
+                report_every_commit = 1
+            elif round((len(commits)/100)) > 100:
+                report_every_commit = 100
+            else:
+                report_every_commit = round((len(commits)/100))
+
+            if commit_counter % report_every_commit == 0:
+               Log.info(str(round((commit_counter/len(commits)*100))) + "% - processed commits: " + str(commit_counter))
 
             if commit.parents:
                 previous_commit = commit.parents[0]
@@ -169,8 +177,7 @@ class RepositoryMiner(object):
             for file in changed_files:
                 commit_files_size[file.path] = file.size
 
-        # for renamed files just create a new one
-        # TODO handle file history
+        # for renamed files just create a new one and link to the old one
         if renamed_files:
             for file in renamed_files:
                 old_file = file[0]
@@ -261,11 +268,23 @@ class RepositoryMiner(object):
             for diff_line in diff_lines[2:]:
                 # get information about line number
                 if (diff_line.startswith('@@', 0, 2)):
-                    deleted_lines_counter = int(diff_line[4:].split(',')[0]) - 1
-                    deleted_lines_count = int(diff_line[4:].split(',')[1].split(' ')[0])
+                    offset = 1
+                    try:
+                        if ',' in diff_line.split('+')[0]:
+                            deleted_lines_counter = int(diff_line[4:].split(',')[0])
+                        else:
+                            deleted_lines_counter = int(diff_line[4:].split(' ')[0])
 
-                    added_lines_counter = int(diff_line.split('+')[1].split(',')[0]) - 1
-                    added_lines_count = int(diff_line.split('+')[1].split(',')[1].split(' ')[0])
+                        if ',' in diff_line.split('+')[1]:
+                            added_lines_counter = int(diff_line.split('+')[1].split(',')[0])
+                        else:
+                            added_lines_counter = int(diff_line.split('+')[1].split(' ')[0])
+
+                        added_lines_counter-=offset
+                        deleted_lines_counter-=offset
+                    except:
+                        print(diff_line)
+                        raise "Exploooode"
 
                 if diff_line.startswith('+', 0, 1):
                     self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
@@ -298,7 +317,7 @@ class RepositoryMiner(object):
             version_id=version_id
         )
         db_session.add(self.line_orm)
-        db_session.commit()
+        #db_session.commit()
 
     def __create_new_commit(self, db_session, commit_id, repository_id, message, timestamp):
         # Try to retrieve the commit record, if not found a new one is created.
@@ -342,7 +361,7 @@ class RepositoryMiner(object):
             file_size=file_size
         )
         db_session.add(self.version_orm)
-        db_session.commit()
+        #db_session.commit()
         return self.version_orm
 
     def get_commits(self):
