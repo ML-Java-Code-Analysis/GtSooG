@@ -6,8 +6,7 @@ from model.objects.IssueTracking import IssueTracking, TYPE_GITHUB
 from repository.RepositoryMiner import RepositoryMiner
 from issues import IssueScanner
 from utils import Log
-import argparse
-import configparser
+from utils import Config
 
 """
 ░░░░░░░░░▄░░░░░░░░░░░░░░▄
@@ -64,24 +63,10 @@ def assign_issue_tracking(repository_id, issue_tracking_type, url, username=None
 
 
 def main():
-
-    parser = argparse.ArgumentParser(description='GtSoog - git data miner')
-    parser.add_argument('-f', action="store", dest="config_file", help='Specify config file')
-    args = parser.parse_args()
-    config_file = args.config_file
-
-    if config_file:
-        config = configparser.ConfigParser()
-        config.read(config_file)
-
-        try:
-            repository_url = config['GIT']['RepositoryURL']
-        except KeyError:
-            raise EnvironmentError('Repository URL is missing in config file')
+    Config.argument_parser()
 
     DB.create_db()
-
-    miner = RepositoryMiner(repository_url)
+    miner = RepositoryMiner(Config.repository_url)
 
     assign_issue_tracking(
         1,
