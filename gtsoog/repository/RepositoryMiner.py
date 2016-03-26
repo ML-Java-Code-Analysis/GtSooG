@@ -111,21 +111,20 @@ class RepositoryMiner(object):
             if commit.parents:
                 previous_commit = commit.parents[0]
 
-            if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
-                self.__process_commit(commit, previous_commit, db_session=self.db_session)
-
             #if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
-                #print(threading.active_count())
-                #if threading.active_count() < self.NUMBER_OF_THREADS:
-                    #t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit))
-                    #threads.append(t)
-                    #t.start()
-                #else:
-                    #for thread in threads:
-                        #thread.join()
-                    #self.db_session.commit()
-                    #self.__process_commit(commit, previous_commit, db_session=self.db_session)
-        #self.db_session.close()
+                #self.__process_commit(commit, previous_commit, db_session=self.db_session)
+
+            if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
+                if threading.active_count() < self.NUMBER_OF_THREADS:
+                    t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit,self.db_session))
+                    threads.append(t)
+                    t.start()
+                else:
+                    for thread in threads:
+                        thread.join()
+                    self.db_session.commit()
+                    self.__process_commit(commit, previous_commit, db_session=self.db_session)
+        self.db_session.close()
 
     def __get_db_session(self):
         for i in range(self.NUMBER_OF_DBSESSIONS):
@@ -143,8 +142,6 @@ class RepositoryMiner(object):
         Returns:
 
         """
-        if not db_session:
-            db_session = DB.create_session()
 
         manipulated_files = self.get_changed_files(commit, previous_commit)
 
@@ -201,8 +198,6 @@ class RepositoryMiner(object):
                                        programming_language, str(old_file.path), old_timestamp)
 
         self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
-        db_session.commit()
-        db_session.close()
 
     def __get_programming_langunage(self, path):
         splitted_path = path.split('.')
@@ -225,7 +220,7 @@ class RepositoryMiner(object):
         for diff_file in files_diff:
             self.__process_file_diff(db_session, diff_file, first_commit, timestamp, commit_id, commit_files_size)
 
-    def __process_file_diff(self, diff_file, first_commit, timestamp, commit_id, commit_files_size, db_session):
+    def __process_file_diff(self, db_session, diff_file, first_commit, timestamp, commit_id, commit_files_size):
 
         # ugly string parsing
         # dooooge pfffui pfffuuuii

@@ -1,10 +1,12 @@
 from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 from model.objects.Base import Base
 from utils import Log
 from utils import Config
 
 __engine = None
+__Session = None
 
 def __get_engine():
     global __engine
@@ -50,6 +52,12 @@ def __get_engine():
             return None
     return __engine
 
+def __get_Session(engine):
+    global __Session
+    if __Session is None:
+        session_factory = sessionmaker(bind=engine)
+        __Session = scoped_session(session_factory)
+    return __Session
 
 # noinspection PyUnresolvedReferences
 def create_db():
@@ -74,7 +82,9 @@ def create_session():
     if engine is None:
         Log.error("DB Engine could not be created! Session creation failed!")
         return None
-    session = sessionmaker()
-    session.configure(bind=engine)
 
-    return session()
+    new_session = __get_Session(engine)
+    if new_session is None:
+        Log.error("Could not create a session!")
+
+    return new_session

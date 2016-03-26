@@ -1,6 +1,7 @@
 import argparse
 import configparser
 from model.objects import IssueTracking
+from utils import Log
 
 #Config parameters
 repository_path = None
@@ -38,22 +39,10 @@ def config_parser(config_file):
         config = configparser.ConfigParser()
         config.read(config_file)
 
+        global database_engine
         #Config parameters
-        try:
-            global programming_languages
-            for item in config.items('PROGRAMMINGLANGUAGES'):
-                programming_languages.append(item)
-        except KeyError:
-            raise EnvironmentError('Programming languages not specified in config file')
 
         try:
-            global number_of_threads
-            number_of_threads = int(config['REPOSTIROYMINER']['number_of_threads'])
-        except KeyError:
-            number_of_threads = 1
-
-        try:
-            global database_engine
             database_engine = config['DATABASE']['database_engine']
         except KeyError:
             raise EnvironmentError('Database engine not specified in config file')
@@ -100,13 +89,31 @@ def config_parser(config_file):
                 raise EnvironmentError('Database port is missing in config file')
 
         try:
+            global programming_languages
+            for item in config.items('PROGRAMMINGLANGUAGES'):
+                programming_languages.append(item)
+        except KeyError:
+            raise EnvironmentError('Programming languages not specified in config file')
+
+        try:
+            global number_of_threads
+            if database_engine == str(DIALECT_SQLITE):
+                Log.warning("Using SQLite as database engine: Only one thread supported. Processing might be slow.")
+                number_of_threads = 1
+            else:
+                number_of_threads = int(config['REPOSTIROYMINER']['number_of_threads'])
+        except KeyError:
+            number_of_threads = 1
+
+        try:
             global number_of_database_sessions
-            number_of_database_sessions = int(config['REPOSTIROYMINER']['number_of_database_sessions'])
+            if database_engine == str(DIALECT_SQLITE):
+                Log.warning("Using SQLite as database engine: Only one database session supported. Processing might be slow.")
+                number_of_database_sessions = 1
+            else:
+                number_of_database_sessions = int(config['REPOSTIROYMINER']['number_of_database_sessions'])
         except KeyError:
             number_of_database_sessions = 1
-
-        if database_engine == DIALECT_SQLITE:
-            number_of_database_sessions = 0
 
         try:
             global repository_path
