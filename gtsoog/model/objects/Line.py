@@ -13,7 +13,7 @@ class Line(Base):
     __tablename__ = 'line'
 
     id = Column(Integer, primary_key=True)
-    line = Column(String(500))
+    line = Column(String(3000))
     line_number = Column(Integer)
     type = Column(Integer)
-    version_id = Column(String(500), ForeignKey("version.id"))
+    version_id = Column(String(36), ForeignKey("version.id"))

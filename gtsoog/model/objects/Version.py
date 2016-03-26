@@ -10,7 +10,7 @@ Base = Base().base
 class Version(Base):
     __tablename__ = 'version'
 
-    id = Column(String(32), primary_key=True)
+    id = Column(String(36), primary_key=True)
 
     file_id = Column(String(36), ForeignKey('file.id'))
     commit_id = Column(String(40), ForeignKey("commit.id"))
