@@ -25,7 +25,7 @@ def retrieve(issue_tracking, issue_nr, existing_issue=None):
     if existing_issue:
         assert existing_issue.id == issue_nr, "The existing issue provided does not have the correct id"
 
-    Log.info("Analyzing Issue #" + issue_nr + " from issue tracking with id " + str(issue_tracking.id))
+    Log.info("Analyzing Issue #" + issue_nr + " from GITHUB issue tracking with id " + str(issue_tracking.id))
 
     issue_url = get_issue_url(issue_tracking.url, issue_nr)
     auth = None
