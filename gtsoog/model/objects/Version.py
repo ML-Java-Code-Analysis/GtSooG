@@ -10,7 +10,7 @@ Base = Base().base
 class Version(Base):
     __tablename__ = 'version'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(String(32), primary_key=True)
 
     file_id = Column(String(500))
     file_timestamp = Column(DateTime)

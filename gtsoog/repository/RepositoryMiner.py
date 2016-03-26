@@ -1,6 +1,7 @@
 import os
 import threading
 import datetime
+from uuid import uuid4 as uuid
 
 from git import Repo
 
@@ -29,8 +30,8 @@ class RepositoryMiner(object):
         self.branch = branch
 
         self.PROGRAMMING_LANGUAGES = Config.programming_languages
-        self.NUMBER_OF_THREADS = Config.number_of_database_sessions
-        self.NUMBER_OF_DBSESSIONS = Config.number_of_threads
+        self.NUMBER_OF_THREADS = Config.number_of_threads
+        self.NUMBER_OF_DBSESSIONS = Config.number_of_database_sessions
 
         self.db_session = None
         self.thread_db_sessions = {}
@@ -111,12 +112,20 @@ class RepositoryMiner(object):
                 previous_commit = commit.parents[0]
 
             if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
-                if threading.active_count() < self.NUMBER_OF_THREADS:
-                    t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit))
-                    threads.append(t)
-                    t.start()
-                else:
-                    self.__process_commit(commit, previous_commit, db_session=self.db_session)
+                self.__process_commit(commit, previous_commit, db_session=self.db_session)
+
+            #if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
+                #print(threading.active_count())
+                #if threading.active_count() < self.NUMBER_OF_THREADS:
+                    #t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit))
+                    #threads.append(t)
+                    #t.start()
+                #else:
+                    #for thread in threads:
+                        #thread.join()
+                    #self.db_session.commit()
+                    #self.__process_commit(commit, previous_commit, db_session=self.db_session)
+        #self.db_session.close()
 
     def __get_db_session(self):
         for i in range(self.NUMBER_OF_DBSESSIONS):
@@ -192,7 +201,7 @@ class RepositoryMiner(object):
                                        programming_language, str(old_file.path), old_timestamp)
 
         self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
-
+        db_session.commit()
         db_session.close()
 
     def __get_programming_langunage(self, path):
@@ -207,8 +216,6 @@ class RepositoryMiner(object):
     def __process_version(self, db_session, files_diff, timestamp, commit_id, commit_files_size):
         # diff string parsing copy pasta, spaghetti
 
-        files_with_lines_metric = []
-
         # handle first commit very ugly
         if "***FIRSTCOMMIT***" in files_diff[0]:
             first_commit = True
@@ -216,98 +223,100 @@ class RepositoryMiner(object):
             first_commit = False
 
         for diff_file in files_diff:
+            self.__process_file_diff(db_session, diff_file, first_commit, timestamp, commit_id, commit_files_size)
 
-            # ugly string parsing
-            # dooooge pfffui pfffuuuii
+    def __process_file_diff(self, diff_file, first_commit, timestamp, commit_id, commit_files_size, db_session):
 
-            added_lines = 0
-            deleted_lines = 0
+        # ugly string parsing
+        # dooooge pfffui pfffuuuii
 
-            # parse every line
-            diff_lines = diff_file.split('\n')
+        added_lines = 0
+        deleted_lines = 0
 
-            if len(diff_lines) <= 1:
-                continue
+        # parse every line
+        diff_lines = diff_file.split('\n')
 
-            # added file
-            if "--- /dev/null" in diff_lines[0]:
-                filename = diff_lines[1][6:]
+        if len(diff_lines) <= 1:
+            return
 
-            # deleted file
-            elif "+++ /dev/null" in diff_lines[1]:
-                filename = diff_lines[0][6:]
+        # added file
+        if "--- /dev/null" in diff_lines[0]:
+            filename = diff_lines[1][6:]
 
-            # skip binary file
-            elif "Binary files" in diff_lines[0]:
-                continue
+        # deleted file
+        elif "+++ /dev/null" in diff_lines[1]:
+            filename = diff_lines[0][6:]
 
-            # renamed file 1
-            elif diff_lines[0][6:] != diff_lines[1][6:]:
-                filename = diff_lines[1][6:]
+        # skip binary file
+        elif "Binary files" in diff_lines[0]:
+            return
 
-            # renamed file 2. Not realy recognized as rename by git. Don't know what to do with that...
-            elif "similarity index 100%" in diff_lines[0]:
-                filename = diff_lines[1][12:]
+        # renamed file 1
+        elif diff_lines[0][6:] != diff_lines[1][6:]:
+            filename = diff_lines[1][6:]
 
-            # changed file
-            else:
-                filename = diff_lines[0][6:]
+        # renamed file 2. Not realy recognized as rename by git. Don't know what to do with that...
+        elif "similarity index 100%" in diff_lines[0]:
+            filename = diff_lines[1][12:]
 
-            # add the version
-            try:
-                version = self.__create_new_version(db_session, filename, timestamp, commit_id, 0, 0,
-                                                    commit_files_size[filename])
-            except KeyError:
-                # in diff there was a difference found. But github commit comparision didn't found a change (added, deleted, changed or renamed file)
-                # At the moment we just ignore this
-                continue
+        # changed file
+        else:
+            filename = diff_lines[0][6:]
 
-            added_lines_counter = 0
-            deleted_lines_counter = 0
+        # add the version
+        try:
+            version = self.__create_new_version(db_session, filename, timestamp, commit_id, 0, 0,
+                                                commit_files_size[filename])
+        except KeyError:
+            # in diff there was a difference found. But github commit comparision didn't found a change (added, deleted, changed or renamed file)
+            # At the moment we just ignore this
+            return
 
-            for diff_line in diff_lines[2:]:
-                # get information about line number
-                if (diff_line.startswith('@@', 0, 2)):
-                    offset = 1
-                    try:
-                        if ',' in diff_line.split('+')[0]:
-                            deleted_lines_counter = int(diff_line[4:].split(',')[0])
-                        else:
-                            deleted_lines_counter = int(diff_line[4:].split(' ')[0])
+        added_lines_counter = 0
+        deleted_lines_counter = 0
 
-                        if ',' in diff_line.split('+')[1]:
-                            added_lines_counter = int(diff_line.split('+')[1].split(',')[0])
-                        else:
-                            added_lines_counter = int(diff_line.split('+')[1].split(' ')[0])
+        for diff_line in diff_lines[2:]:
+            # get information about line number
+            if (diff_line.startswith('@@', 0, 2)):
+                offset = 1
+                try:
+                    if ',' in diff_line.split('+')[0]:
+                        deleted_lines_counter = int(diff_line[4:].split(',')[0])
+                    else:
+                        deleted_lines_counter = int(diff_line[4:].split(' ')[0])
 
-                        added_lines_counter-=offset
-                        deleted_lines_counter-=offset
-                    except:
-                        print(diff_line)
-                        raise "Exploooode"
+                    if ',' in diff_line.split('+')[1]:
+                        added_lines_counter = int(diff_line.split('+')[1].split(',')[0])
+                    else:
+                        added_lines_counter = int(diff_line.split('+')[1].split(' ')[0])
 
-                if diff_line.startswith('+', 0, 1):
+                    added_lines_counter-=offset
+                    deleted_lines_counter-=offset
+                except:
+                    print(diff_line)
+                    raise "Exploooode"
+
+            if diff_line.startswith('+', 0, 1):
+                self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
+                added_lines += 1
+                deleted_lines_counter -= 1
+
+            if diff_line.startswith('-', 0, 1):
+                # first commit deleted lines = added lines
+                if first_commit:
                     self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
                     added_lines += 1
                     deleted_lines_counter -= 1
+                else:
+                    self.__create_new_line(db_session, diff_line[1:], deleted_lines_counter, TYPE_DELETED, version.id)
+                    deleted_lines += 1
+                    added_lines_counter -= 1
 
-                if diff_line.startswith('-', 0, 1):
-                    # first commit deleted lines = added lines
-                    if first_commit:
-                        self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
-                        added_lines += 1
-                        deleted_lines_counter -= 1
-                    else:
-                        self.__create_new_line(db_session, diff_line[1:], deleted_lines_counter, TYPE_DELETED, version.id)
-                        deleted_lines += 1
-                        added_lines_counter -= 1
+            added_lines_counter += 1
+            deleted_lines_counter += 1
 
-                added_lines_counter += 1
-                deleted_lines_counter += 1
-
-            version.lines_added = added_lines
-            version.lines_deleted = deleted_lines
-            db_session.commit()
+        version.lines_added = added_lines
+        version.lines_deleted = deleted_lines
 
     def __create_new_line(self, db_session, line, line_number, type, version_id):
         self.line_orm = Line(
@@ -317,7 +326,6 @@ class RepositoryMiner(object):
             version_id=version_id
         )
         db_session.add(self.line_orm)
-        #db_session.commit()
 
     def __create_new_commit(self, db_session, commit_id, repository_id, message, timestamp):
         # Try to retrieve the commit record, if not found a new one is created.
@@ -331,7 +339,6 @@ class RepositoryMiner(object):
                 timestamp=timestamp
             )
             db_session.add(self.commit_orm)
-            db_session.commit()
 
     def __create_new_file(self, db_session, file_id, timestamp, repository_id, language, precursor_file_id=None,
                           precursor_file_timestamp=None):
@@ -347,12 +354,12 @@ class RepositoryMiner(object):
                 language=language
             )
             db_session.add(self.file_orm)
-            db_session.commit()
 
     def __create_new_version(self, db_session, file_id, file_timestamp, commit_id, lines_added,
                              lines_deleted,
                              file_size):
         self.version_orm = Version(
+            id=uuid().hex,
             file_id=file_id,
             file_timestamp=file_timestamp,
             commit_id=commit_id,
@@ -361,7 +368,6 @@ class RepositoryMiner(object):
             file_size=file_size
         )
         db_session.add(self.version_orm)
-        #db_session.commit()
         return self.version_orm
 
     def get_commits(self):
