@@ -1,4 +1,4 @@
-from json.decoder import JSONDecodeError
+#from json.decoder import JSONDecodeError
 
 import requests
 
@@ -41,7 +41,7 @@ def retrieve(issue_tracking, issue_nr, existing_issue=None):
 
     try:
         issue_json = response.json()
-    except JSONDecodeError:
+    except: # JSONDecodeError:
         Log.error("Issue #" + issue_nr + " retrieved from " + issue_url + " could not be parsed to JSON")
         return None
 

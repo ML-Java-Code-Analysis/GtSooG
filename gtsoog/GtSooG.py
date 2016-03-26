@@ -32,6 +32,8 @@ from utils import Config
 
 
 # TODO: find better place for this function
+# TODO: NIcht repository-ID übergeben, sondern repository-objekt
+# TODO: DOkumentieren
 def assign_issue_tracking(repository_id, issue_tracking_type, url, username=None, password=None):
     db_session = DB.create_session()
     query = db_session.query(Repository).filter(Repository.id == repository_id)
@@ -70,12 +72,14 @@ def main():
 
     miner = RepositoryMiner(Config.repository_path)
 
+    """
     assign_issue_tracking(
         1,
         Config.issue_tracking_system,
         Config.issue_tracking_url
     )
-    IssueScanner.scan_for_repository(1)
+
+    IssueScanner.scan_for_repository(1)"""
 
 
 main()

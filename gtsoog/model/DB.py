@@ -32,7 +32,7 @@ def __get_engine():
         if db_dialect == Config.DIALECT_SQLITE:
             __engine = create_engine('sqlite:///{0}.db'.format(db_name))
         elif db_dialect == Config.DIALECT_MYSQL:
-            url = r'mysql+pymysql://{auth_string}{host}{port_string}/{db_name}?charset=utf8mb4'.format(
+            url = r'mysql+mysqlconnector://{auth_string}{host}{port_string}/{db_name}?charset=utf8'.format(
                 auth_string=auth_string,
                 host=host,
                 port_string=port_string,

@@ -12,12 +12,7 @@ class Version(Base):
 
     id = Column(String(32), primary_key=True)
 
-    file_id = Column(String(500))
-    file_timestamp = Column(DateTime)
-    __table_args__ = (ForeignKeyConstraint([file_id, file_timestamp],
-                                           ["file.id", "file.timestamp"]),
-                      {})
-
+    file_id = Column(String(36), ForeignKey('file.id'))
     commit_id = Column(String(40), ForeignKey("commit.id"))
     lines_added = Column(Integer, nullable=False)
     lines_deleted = Column(Integer, nullable=False)

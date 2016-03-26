@@ -122,8 +122,8 @@ class RepositoryMiner(object):
                 else:
                     for thread in threads:
                         thread.join()
-                    self.db_session.commit()
                     self.__process_commit(commit, previous_commit, db_session=self.db_session)
+                    self.db_session.commit()
         self.db_session.close()
 
     def __get_db_session(self):
@@ -178,10 +178,18 @@ class RepositoryMiner(object):
         if deleted_files:
             for file in deleted_files:
                 commit_files_size[file.path] = file.size
+                old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
+                    desc(File.timestamp)).first()
+                old_file.timestamp = timestamp
 
         if changed_files:
             for file in changed_files:
                 commit_files_size[file.path] = file.size
+                old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
+                    desc(File.timestamp)).first()
+                old_file.timestamp = timestamp
+
+
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -192,10 +200,10 @@ class RepositoryMiner(object):
                 commit_files_size[new_file.path] = new_file.size
                 programming_language = self.__get_programming_langunage(new_file.path)
                 # get the timestamp from old filename
-                old_timestamp = self.db_session.query(File).filter(File.id == str(old_file.path)).order_by(
-                    desc(File.timestamp)).first().timestamp
+                old_id = self.db_session.query(File).filter(File.path == str(old_file.path)).order_by(
+                    desc(File.timestamp)).first().id
                 self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
-                                       programming_language, str(old_file.path), old_timestamp)
+                                       programming_language, old_id)
 
         self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
 
@@ -224,6 +232,8 @@ class RepositoryMiner(object):
 
         # ugly string parsing
         # dooooge pfffui pfffuuuii
+        if first_commit:
+            return
 
         added_lines = 0
         deleted_lines = 0
@@ -260,8 +270,9 @@ class RepositoryMiner(object):
 
         # add the version
         try:
-            version = self.__create_new_version(db_session, filename, timestamp, commit_id, 0, 0,
-                                                commit_files_size[filename])
+            file_orm = db_session.query(File).filter(File.path == filename, File.timestamp == timestamp).one_or_none()
+            file_id = file_orm.id
+            version = self.__create_new_version(db_session, file_id, commit_id, 0, 0, commit_files_size[filename])
         except KeyError:
             # in diff there was a difference found. But github commit comparision didn't found a change (added, deleted, changed or renamed file)
             # At the moment we just ignore this
@@ -314,56 +325,54 @@ class RepositoryMiner(object):
         version.lines_deleted = deleted_lines
 
     def __create_new_line(self, db_session, line, line_number, type, version_id):
-        self.line_orm = Line(
+        line_orm = Line(
             line=line,
             line_number=line_number,
             type=type,
             version_id=version_id
         )
-        db_session.add(self.line_orm)
+        db_session.add(line_orm)
 
     def __create_new_commit(self, db_session, commit_id, repository_id, message, timestamp):
         # Try to retrieve the commit record, if not found a new one is created.
         # TODO: Now that existing commits are skipped anyway, this query could be removed for performance
-        self.commit_orm = db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
-        if not self.commit_orm:
-            self.commit_orm = Commit(
+        commit_orm = db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
+        if not commit_orm:
+            commit_orm = Commit(
                 id=commit_id,
                 repository_id=repository_id,
                 message=message,
                 timestamp=timestamp
             )
-            db_session.add(self.commit_orm)
+            db_session.add(commit_orm)
 
-    def __create_new_file(self, db_session, file_id, timestamp, repository_id, language, precursor_file_id=None,
-                          precursor_file_timestamp=None):
+    def __create_new_file(self, db_session, file_path, timestamp, repository_id, language, precursor_file_id=None):
         # Try to retrieve the file record, if not found a new one is created.
-        self.file_orm = db_session.query(File).filter(File.id == file_id, File.timestamp == timestamp).one_or_none()
-        if not self.file_orm:
-            self.file_orm = File(
-                id=file_id,
+        file_orm = db_session.query(File).filter(File.path == file_path, File.timestamp == timestamp).one_or_none()
+        if not file_orm:
+            file_orm = File(
+                id=uuid().hex,
+                path=file_path,
                 timestamp=timestamp,
                 repository_id=repository_id,
                 precursor_file_id=precursor_file_id,
-                precursor_file_timestamp=precursor_file_timestamp,
                 language=language
             )
-            db_session.add(self.file_orm)
+            db_session.add(file_orm)
 
-    def __create_new_version(self, db_session, file_id, file_timestamp, commit_id, lines_added,
+    def __create_new_version(self, db_session, file_id, commit_id, lines_added,
                              lines_deleted,
                              file_size):
-        self.version_orm = Version(
+        version_orm = Version(
             id=uuid().hex,
             file_id=file_id,
-            file_timestamp=file_timestamp,
             commit_id=commit_id,
             lines_added=lines_added,
             lines_deleted=lines_deleted,
             file_size=file_size
         )
-        db_session.add(self.version_orm)
-        return self.version_orm
+        db_session.add(version_orm)
+        return version_orm
 
     def get_commits(self):
         """
