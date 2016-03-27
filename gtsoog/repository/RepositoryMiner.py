@@ -15,6 +15,10 @@ from utils import Log
 from sqlalchemy import desc
 from utils import Config
 
+#TODO Nur ausgewählte Datentypen in DB
+#TODO Fixen, sodass es läuft
+#TODO refactor
+#TODO Performance Optimierung mit Threads
 
 class RepositoryMiner(object):
     def __init__(self, repository_path, name=None, branch='master'):
@@ -41,7 +45,7 @@ class RepositoryMiner(object):
         self.repository_id = self.__create_new_repository(name, repository_path)
 
         Log.info("Start mining the repository with path: " + repository_path)
-        commits = self.get_commits()
+        commits = self.__get_commits()
         self.iterate_commits(commits)
 
         self.close_all_db_sessions()
@@ -94,9 +98,13 @@ class RepositoryMiner(object):
         previous_commit = None
 
         threads = []
-        commit_counter = 0
 
-        for commit in commits:
+        #handle first commit special
+        self.__process_first_commit(commits[0], self.db_session)
+        self.db_session.commit()
+        commit_counter = 1
+
+        for commit in commits[1:]:
             commit_counter += 1
             if round((len(commits)/100)) < 1:
                 report_every_commit = 1
@@ -111,14 +119,12 @@ class RepositoryMiner(object):
             if commit.parents:
                 previous_commit = commit.parents[0]
 
-            #if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
-                #self.__process_commit(commit, previous_commit, db_session=self.db_session)
-
             if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
                 if threading.active_count() < self.NUMBER_OF_THREADS:
-                    t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit,self.db_session))
+                    t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit, self.db_session))
                     threads.append(t)
                     t.start()
+                    pass
                 else:
                     for thread in threads:
                         thread.join()
@@ -132,6 +138,37 @@ class RepositoryMiner(object):
             if not session_tuple[0]:
                 return session_tuple[1]
 
+    def __process_first_commit(self, commit, db_session):
+        files = self.__get_changed_files_first_commit(commit)
+        added_files = files['added_files']
+        files_diff = files['files_diff']
+
+        commit_time = datetime.datetime.utcfromtimestamp(commit.committed_date)
+        timestamp = commit_time
+        commit_id = str(commit)
+
+        self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit_time)
+
+        if added_files:
+            for file in added_files:
+                programming_language = self.__get_programming_langunage(file.path)
+
+                #skip this file because language is not interessting for us
+                if programming_language == None:
+                    continue
+                file_diff = self.__get_diff_for_file(files_diff,str(file.path))
+
+                #File could not be found in diff. hmmmmm
+                if not file_diff:
+                    continue
+
+                created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
+                                       programming_language)
+                db_session.commit()
+                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
+                self.__process_code_lines_first_commit(db_session, file_diff['code'], created_version)
+
+
     def __process_commit(self, commit, previous_commit, db_session=None):
         """
 
@@ -143,13 +180,15 @@ class RepositoryMiner(object):
 
         """
 
-        manipulated_files = self.get_changed_files(commit, previous_commit)
+        manipulated_files = self.__get_changed_files(commit, previous_commit)
 
-        added_files = manipulated_files[0]
-        deleted_files = manipulated_files[1]
-        changed_files = manipulated_files[2]
-        renamed_files = manipulated_files[3]
-        files_diff = manipulated_files[4]
+        added_files = manipulated_files['added_files']
+        deleted_files = manipulated_files['deleted_files']
+        changed_files = manipulated_files['changed_files']
+        renamed_files = manipulated_files['renamed_files']
+        files_diff = manipulated_files['files_diff']
+
+        #no fiiles were changed at all
         if (not added_files) and (not deleted_files) and (not changed_files) and (not renamed_files) and (
                 not renamed_files):
             return
@@ -157,224 +196,96 @@ class RepositoryMiner(object):
         commit_time = datetime.datetime.utcfromtimestamp(commit.committed_date)
         timestamp = commit_time
         commit_id = str(commit)
-        commit_files_size = {}
 
         self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit_time)
 
-        # Log.log("------------", Log.LEVEL_DEBUG)
-        # Log.log("Commit: " + commit.message + "with ID: " + str(commit) + "Commit date: " + str(commit_time), Log.LEVEL_DEBUG)
-        # Log.log("Added: " + str([file.path for file in added_files]), Log.LEVEL_DEBUG)
-        # Log.log("Deleted: " + str([file.path for file in deleted_files]), Log.LEVEL_DEBUG)
-        # Log.log("Changed: " + str([file.path for file in changed_files]), Log.LEVEL_DEBUG)
-        # Log.log("Diff: " + str(files_diff), Log.LEVEL_DEBUG)
-
         if added_files:
             for file in added_files:
-                commit_files_size[file.path] = file.size
                 programming_language = self.__get_programming_langunage(file.path)
-                self.__create_new_file(db_session, str(file.path), commit_time, self.repository_id,
+
+                #skip this file because language is not interessting for us
+                if not programming_language:
+                    continue
+
+                file_diff = self.__get_diff_for_file(files_diff,str(file.path))
+
+                #File could not be found in diff. hmmmmm
+                if not file_diff:
+                    continue
+
+                created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
                                        programming_language)
+                db_session.commit()
+                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
+                self.__process_code_lines(db_session, file_diff['code'], created_version)
 
         if deleted_files:
             for file in deleted_files:
-                commit_files_size[file.path] = file.size
+                programming_language = self.__get_programming_langunage(file.path)
+
+                #skip this file because language is not interessting for us
+                if not programming_language:
+                    continue
+
+                file_diff = self.__get_diff_for_file(files_diff,str(file.path))
+
+                #File could not be found in diff. hmmmmm
+                if not file_diff:
+                    continue
+
                 old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
                     desc(File.timestamp)).first()
                 old_file.timestamp = timestamp
+                db_session.commit()
+                created_version = self.__create_new_version(db_session, old_file.id, commit_id, 0, 0, file.size)
+                self.__process_code_lines(db_session, file_diff['code'], created_version)
 
         if changed_files:
             for file in changed_files:
-                commit_files_size[file.path] = file.size
+
+                programming_language = self.__get_programming_langunage(file.path)
+
+                #skip this file because language is not interessting for us
+                if not programming_language:
+                    continue
+
+                file_diff = self.__get_diff_for_file(files_diff,str(file.path))
+
+                #File could not be found in diff. hmmmmm
+                if not file_diff:
+                    continue
+
                 old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
-                    desc(File.timestamp)).first()
+                desc(File.timestamp)).first()
                 old_file.timestamp = timestamp
+
+                db_session.commit()
+                created_version = self.__create_new_version(db_session, old_file.id, commit_id, 0, 0, file.size)
+                self.__process_code_lines(db_session, file_diff['code'], created_version)
 
 
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
             for file in renamed_files:
-                old_file = file[0]
-                new_file = file[1]
+                old_file = file['old_file']
+                new_file = file['new_file']
 
-                commit_files_size[new_file.path] = new_file.size
                 programming_language = self.__get_programming_langunage(new_file.path)
-                # get the timestamp from old filename
-                old_id = self.db_session.query(File).filter(File.path == str(old_file.path)).order_by(
+                #skip this file because language is not interessting for us
+                if not programming_language:
+                    continue
+
+                old_file = self.db_session.query(File).filter(File.path == str(old_file.path)).order_by(
                     desc(File.timestamp)).first().id
-                self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
-                                       programming_language, old_id)
+                created_file = self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
+                                       programming_language, old_file)
+                db_session.commit()
+                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, new_file.size)
 
-        self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
+        #self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
 
-    def __get_programming_langunage(self, path):
-        splitted_path = path.split('.')
-
-        if len(splitted_path) > 1:
-            for language in self.PROGRAMMING_LANGUAGES:
-                if language[1] == splitted_path[1]:
-                    return language[0]
-        return "NOT_FOUND"
-
-    def __process_version(self, db_session, files_diff, timestamp, commit_id, commit_files_size):
-        # diff string parsing copy pasta, spaghetti
-
-        # handle first commit very ugly
-        if "***FIRSTCOMMIT***" in files_diff[0]:
-            first_commit = True
-        else:
-            first_commit = False
-
-        for diff_file in files_diff:
-            self.__process_file_diff(db_session, diff_file, first_commit, timestamp, commit_id, commit_files_size)
-
-    def __process_file_diff(self, db_session, diff_file, first_commit, timestamp, commit_id, commit_files_size):
-
-        # ugly string parsing
-        # dooooge pfffui pfffuuuii
-        if first_commit:
-            return
-
-        added_lines = 0
-        deleted_lines = 0
-
-        # parse every line
-        diff_lines = diff_file.split('\n')
-
-        if len(diff_lines) <= 1:
-            return
-
-        # added file
-        if "--- /dev/null" in diff_lines[0]:
-            filename = diff_lines[1][6:]
-
-        # deleted file
-        elif "+++ /dev/null" in diff_lines[1]:
-            filename = diff_lines[0][6:]
-
-        # skip binary file
-        elif "Binary files" in diff_lines[0]:
-            return
-
-        # renamed file 1
-        elif diff_lines[0][6:] != diff_lines[1][6:]:
-            filename = diff_lines[1][6:]
-
-        # renamed file 2. Not realy recognized as rename by git. Don't know what to do with that...
-        elif "similarity index 100%" in diff_lines[0]:
-            filename = diff_lines[1][12:]
-
-        # changed file
-        else:
-            filename = diff_lines[0][6:]
-
-        # add the version
-        try:
-            file_orm = db_session.query(File).filter(File.path == filename, File.timestamp == timestamp).one_or_none()
-            file_id = file_orm.id
-            version = self.__create_new_version(db_session, file_id, commit_id, 0, 0, commit_files_size[filename])
-        except KeyError:
-            # in diff there was a difference found. But github commit comparision didn't found a change (added, deleted, changed or renamed file)
-            # At the moment we just ignore this
-            return
-
-        added_lines_counter = 0
-        deleted_lines_counter = 0
-
-        for diff_line in diff_lines[2:]:
-            # get information about line number
-            if (diff_line.startswith('@@', 0, 2)):
-                offset = 1
-                try:
-                    if ',' in diff_line.split('+')[0]:
-                        deleted_lines_counter = int(diff_line[4:].split(',')[0])
-                    else:
-                        deleted_lines_counter = int(diff_line[4:].split(' ')[0])
-
-                    if ',' in diff_line.split('+')[1]:
-                        added_lines_counter = int(diff_line.split('+')[1].split(',')[0])
-                    else:
-                        added_lines_counter = int(diff_line.split('+')[1].split(' ')[0])
-
-                    added_lines_counter-=offset
-                    deleted_lines_counter-=offset
-                except:
-                    print(diff_line)
-                    raise "Exploooode"
-
-            if diff_line.startswith('+', 0, 1):
-                self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
-                added_lines += 1
-                deleted_lines_counter -= 1
-
-            if diff_line.startswith('-', 0, 1):
-                # first commit deleted lines = added lines
-                if first_commit:
-                    self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
-                    added_lines += 1
-                    deleted_lines_counter -= 1
-                else:
-                    self.__create_new_line(db_session, diff_line[1:], deleted_lines_counter, TYPE_DELETED, version.id)
-                    deleted_lines += 1
-                    added_lines_counter -= 1
-
-            added_lines_counter += 1
-            deleted_lines_counter += 1
-
-        version.lines_added = added_lines
-        version.lines_deleted = deleted_lines
-
-    def __create_new_line(self, db_session, line, line_number, type, version_id):
-        line_orm = Line(
-            line=line,
-            line_number=line_number,
-            type=type,
-            version_id=version_id
-        )
-        db_session.add(line_orm)
-
-    def __create_new_commit(self, db_session, commit_id, repository_id, message, timestamp):
-        # Try to retrieve the commit record, if not found a new one is created.
-        # TODO: Now that existing commits are skipped anyway, this query could be removed for performance
-        commit_orm = db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
-        if not commit_orm:
-            commit_orm = Commit(
-                id=commit_id,
-                repository_id=repository_id,
-                message=message,
-                timestamp=timestamp
-            )
-            db_session.add(commit_orm)
-
-    def __create_new_file(self, db_session, file_path, timestamp, repository_id, language, precursor_file_id=None):
-        # Try to retrieve the file record, if not found a new one is created.
-        file_orm = db_session.query(File).filter(File.path == file_path, File.timestamp == timestamp).one_or_none()
-        if not file_orm:
-            file_orm = File(
-                id=uuid().hex,
-                path=file_path,
-                timestamp=timestamp,
-                repository_id=repository_id,
-                precursor_file_id=precursor_file_id,
-                language=language
-            )
-            db_session.add(file_orm)
-
-    def __create_new_version(self, db_session, file_id, commit_id, lines_added,
-                             lines_deleted,
-                             file_size):
-        version_orm = Version(
-            id=uuid().hex,
-            file_id=file_id,
-            commit_id=commit_id,
-            lines_added=lines_added,
-            lines_deleted=lines_deleted,
-            file_size=file_size
-        )
-        db_session.add(version_orm)
-        return version_orm
-
-    def get_commits(self):
+    def __get_commits(self):
         """
         Get all commits of a repository
         Returns: commits in reversed order --> first commit is first element in list
@@ -383,7 +294,7 @@ class RepositoryMiner(object):
         commits.reverse()
         return commits
 
-    def get_changed_files(self, commit, previous_commit):
+    def __get_changed_files(self, commit, previous_commit):
 
         """
 
@@ -420,19 +331,226 @@ class RepositoryMiner(object):
             if (item.a_blob is not None) and (item.b_blob is not None) and (not item.renamed):
                 changed_files.append(item.a_blob)
             if item.renamed:
-                renamed_files.append((item.a_blob, item.b_blob))
+                renamed_files.append({'old_file': item.a_blob, 'new_file': item.b_blob})
 
         for item in diff_with_patch:
-            # mark first commit for later handeling
-            if previous_commit is None:
-                files_diff.append("***FIRSTCOMMIT***")
-
-            # TODO here we lose file size I guess. Compare it to original file
+              # TODO here we lose file size I guess. Compare it to original file
             files_diff.append(item.diff.decode("utf-8", "ignore"))
 
-        """ handle first commit"""
-        if previous_commit is None:
-            added_files = deleted_files
-            deleted_files = []
+        return {'added_files': added_files, 'deleted_files': deleted_files, 'changed_files': changed_files, 'renamed_files': renamed_files, 'files_diff': files_diff}
 
-        return added_files, deleted_files, changed_files, renamed_files, files_diff
+    def __get_changed_files_first_commit(self, commit):
+
+        """
+
+        Args:
+            commit:
+            previous_commit:
+
+        Returns: tuple of lists of added_files, deleted_files, changed_files, differences in string format
+
+        """
+        assert commit is not None
+
+        added_files = []
+        changed_files = []
+        files_diff = []
+
+        """ do the diff for previous_commit
+            otherwise diff shows added code as deleted code
+        """
+        diff_with_patch = commit.diff(None, staged=False, create_patch=True)
+        diff = commit.diff(None)
+
+        for item in diff:
+            if item.b_blob is None:
+                added_files.append(item.a_blob)
+
+        for item in diff_with_patch:
+              # TODO here we lose file size I guess. Compare it to original file
+            files_diff.append(item.diff.decode("utf-8", "ignore"))
+
+        return {'added_files': added_files, 'files_diff': files_diff}
+
+    def __get_diff_for_file(self, files_diff, search_filename):
+
+        # search the files_diff output for the right filename and return None if not found
+        # if found return a dictrionary file,changed_line,code
+        for diff_file in files_diff:
+            diff_lines = diff_file.split('\n')
+            if len(diff_lines) <= 1:
+                continue
+
+            # added file
+            if "--- /dev/null" in diff_lines[0]:
+                filename = diff_lines[1][6:]
+
+            # deleted file
+            elif "+++ /dev/null" in diff_lines[1]:
+                filename = diff_lines[0][6:]
+
+            # skip binary file
+            elif "Binary files" in diff_lines[0]:
+                continue
+
+            # renamed file 1
+            elif diff_lines[0][6:] != diff_lines[1][6:]:
+                filename = diff_lines[1][6:]
+
+            # renamed file 2. Not realy recognized as rename by git. Don't know what to do with that...
+            elif "similarity index 100%" in diff_lines[0]:
+                filename = diff_lines[1][12:]
+
+            # changed file
+            else:
+                filename = diff_lines[0][6:]
+
+            if filename == search_filename:
+                lines_changed = diff_lines[3]
+                code = diff_lines[3:]
+                return {'filename': filename, 'code': code}
+
+        return None
+
+    def __process_code_lines(self, db_session, code, version):
+        added_lines_counter = 0
+        added_lines = 0
+        deleted_lines_counter = 0
+        deleted_lines = 0
+
+        for diff_line in code:
+            # get information about line number
+            if (diff_line.startswith('@@', 0, 2)):
+                offset = 1
+                try:
+                    if ',' in diff_line.split('+')[0]:
+                        deleted_lines_counter = int(diff_line[4:].split(',')[0])
+                    else:
+                        deleted_lines_counter = int(diff_line[4:].split(' ')[0])
+
+                    if ',' in diff_line.split('+')[1]:
+                        added_lines_counter = int(diff_line.split('+')[1].split(',')[0])
+                    else:
+                        added_lines_counter = int(diff_line.split('+')[1].split(' ')[0])
+
+                    added_lines_counter-=offset
+                    deleted_lines_counter-=offset
+                except:
+                    print(diff_line)
+                    raise "Exploooode"
+
+            if diff_line.startswith('+', 0, 1):
+                self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
+                added_lines += 1
+                deleted_lines_counter -= 1
+
+            if diff_line.startswith('-', 0, 1):
+                self.__create_new_line(db_session, diff_line[1:], deleted_lines_counter, TYPE_DELETED, version.id)
+                deleted_lines += 1
+                added_lines_counter -= 1
+
+            added_lines_counter += 1
+            deleted_lines_counter += 1
+
+        version.lines_added = added_lines
+        version.lines_deleted = deleted_lines
+
+    def __process_code_lines_first_commit(self, db_session, code, version):
+        added_lines_counter = 0
+        added_lines = 0
+
+        for diff_line in code:
+            # get information about line number
+            if (diff_line.startswith('@@', 0, 2)):
+                offset = 1
+                try:
+                    if ',' in diff_line.split('+')[1]:
+                        added_lines_counter = int(diff_line.split('+')[1].split(',')[0])
+                    else:
+                        added_lines_counter = int(diff_line.split('+')[1].split(' ')[0])
+
+                    added_lines_counter-=offset
+                except:
+                    print(diff_line)
+                    raise "Exploooode"
+
+            if diff_line.startswith('-', 0, 1):
+                self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
+                added_lines += 1
+
+            added_lines_counter += 1
+
+        version.lines_added = added_lines
+
+    def __get_programming_langunage(self, path):
+        splitted_path = path.split('.')
+
+        if len(splitted_path) > 1:
+            for language in self.PROGRAMMING_LANGUAGES:
+                if language[1] == splitted_path[1]:
+                    return language[0]
+        return None
+
+
+    def __create_new_commit(self, db_session, commit_id, repository_id, message, timestamp):
+        # Try to retrieve the commit record, if not found a new one is created.
+        # TODO: Now that existing commits are skipped anyway, this query could be removed for performance
+        commit_orm = db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
+        if not commit_orm:
+            commit_orm = Commit(
+                id=commit_id,
+                repository_id=repository_id,
+                message=message,
+                timestamp=timestamp
+            )
+            db_session.add(commit_orm)
+
+    def __create_new_file(self, db_session, file_path, timestamp, repository_id, language, precursor_file_id=None):
+        # Try to retrieve the file record, if not found a new one is created.
+        file_orm = db_session.query(File).filter(File.path == file_path, File.timestamp == timestamp).one_or_none()
+        if not file_orm:
+            file_orm = File(
+                id=uuid().hex,
+                path=file_path,
+                timestamp=timestamp,
+                repository_id=repository_id,
+                precursor_file_id=precursor_file_id,
+                language=language
+            )
+            db_session.add(file_orm)
+        return file_orm
+
+
+    def __process_version(self, db_session, files_diff, timestamp, commit_id, commit_files_size):
+        # diff string parsing copy pasta, spaghetti
+
+        # handle first commit very ugly
+        if "***FIRSTCOMMIT***" in files_diff[0]:
+            first_commit = True
+        else:
+            first_commit = False
+
+        for diff_file in files_diff:
+            self.__process_file_diff(db_session, diff_file, first_commit, timestamp, commit_id, commit_files_size)
+    def __create_new_version(self, db_session, file_id, commit_id, lines_added,
+                             lines_deleted,
+                             file_size):
+        version_orm = Version(
+            id=uuid().hex,
+            file_id=file_id,
+            commit_id=commit_id,
+            lines_added=lines_added,
+            lines_deleted=lines_deleted,
+            file_size=file_size
+        )
+        db_session.add(version_orm)
+        return version_orm
+
+    def __create_new_line(self, db_session, line, line_number, type, version_id):
+        line_orm = Line(
+            line=line,
+            line_number=line_number,
+            type=type,
+            version_id=version_id
+        )
+        db_session.add(line_orm)
