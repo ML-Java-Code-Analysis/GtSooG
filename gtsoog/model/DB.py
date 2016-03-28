@@ -8,15 +8,16 @@ from utils import Config
 __engine = None
 __Session = None
 
+
 def __get_engine():
     global __engine
 
-    db_dialect=Config.database_engine
-    db_name=Config.database_name
-    user=Config.database_user
-    password=Config.database_user_password
-    host=Config.database_host
-    port=Config.database_port
+    db_dialect = Config.database_dialect
+    db_name = Config.database_name
+    user = Config.database_user
+    password = Config.database_user_password
+    host = Config.database_host
+    port = Config.database_port
 
     auth_string = ""
     if user:
@@ -52,12 +53,14 @@ def __get_engine():
             return None
     return __engine
 
-def __get_Session(engine):
+
+def __get_session(engine):
     global __Session
     if __Session is None:
         session_factory = sessionmaker(bind=engine)
         __Session = scoped_session(session_factory)
     return __Session
+
 
 # noinspection PyUnresolvedReferences
 def create_db():
@@ -83,7 +86,7 @@ def create_session():
         Log.error("DB Engine could not be created! Session creation failed!")
         return None
 
-    new_session = __get_Session(engine)
+    new_session = __get_session(engine)
     if new_session is None:
         Log.error("Could not create a session!")
 

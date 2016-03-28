@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql.schema import ForeignKey, ForeignKeyConstraint
-from model.objects.Base import Base
+from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.schema import ForeignKey
+
+from model.objects.Base import Base
 
 Base = Base().base
 

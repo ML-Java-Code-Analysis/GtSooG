@@ -1,10 +1,9 @@
-from json.decoder import JSONDecodeError
+import requests
+from requests.auth import HTTPBasicAuth
 
 from model.objects.Issue import Issue, TYPE_BUG, TYPE_ENHANCEMENT, TYPE_OTHER
 from model.objects.IssueTracking import IssueTracking, TYPE_JIRA
 from utils import Log
-import requests
-from requests.auth import HTTPBasicAuth
 
 
 def retrieve(issue_tracking, issue_id, existing_issue=None):
@@ -36,20 +35,20 @@ def retrieve(issue_tracking, issue_id, existing_issue=None):
     response = requests.get(issue_url, auth=auth)
 
     if not response.status_code == 200:
-        Log.error("Issue " + issue_id + " could not be retrieved from " + issue_url + \
+        Log.error("Issue " + issue_id + " could not be retrieved from " + issue_url +
                   ". Status Code: " + str(response.status_code))
         return None
 
     try:
         issue_json = response.json()
-    except JSONDecodeError:
+    except ValueError:
         Log.error("Issue " + issue_id + " retrieved from " + issue_url + " could not be parsed to JSON")
         return None
 
     # Check for some fields to determine wether the parsed data seems to be an issue
     if 'key' not in issue_json or not str(issue_json['key']) == issue_id \
             or 'fields' not in issue_json or 'issuetype' not in issue_json['fields']:
-        Log.error("Retrieved JSON for Issue " + issue_id + " from " + issue_url + \
+        Log.error("Retrieved JSON for Issue " + issue_id + " from " + issue_url +
                   " doesn't seem to represent an actual issue.")
         return None
 

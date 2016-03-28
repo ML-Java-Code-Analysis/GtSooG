@@ -1,12 +1,26 @@
-from sqlalchemy.orm.exc import NoResultFound
-
 from model import DB
-from model.objects.Repository import Repository
-from model.objects.IssueTracking import IssueTracking, TYPE_GITHUB
 from repository.RepositoryMiner import RepositoryMiner
-from issues import IssueScanner
-from utils import Log
 from utils import Config
+from utils import Log
+
+
+def main():
+    #
+    cli_args = Config.parse_arguments()
+
+    # A config file must be provided, or else nothing will work.
+    if not hasattr(cli_args, 'config_file') or not cli_args.config_file:
+        Log.error("A config file must be specified!")
+        return
+    Config.parse_config(cli_args.config_file)
+
+    Log.info("Started. Creating database")
+    DB.create_db()
+
+    RepositoryMiner(Config.repository_path)
+
+
+main()
 
 """
 ░░░░░░░░░▄░░░░░░░░░░░░░░▄
@@ -29,60 +43,6 @@ from utils import Config
 ░░░░░░▀▄▄▄▄▄▄▀▀▀▒▒▒▒▒▄▄▀
 ░░░░░░░░░▒▒▒▒▒▒▒▒▒▒▀▀
 """
-
-
-# TODO: find better place for this function
-# TODO: NIcht repository-ID übergeben, sondern repository-objekt
-# TODO: DOkumentieren
-def assign_issue_tracking(repository_id, issue_tracking_type, url, username=None, password=None):
-    db_session = DB.create_session()
-    query = db_session.query(Repository).filter(Repository.id == repository_id)
-    try:
-        repository = query.one()
-    except NoResultFound:
-        Log.error("No Repository found with id " + str(repository_id))
-        db_session.close()
-        return
-
-    if repository.issueTracking is not None:
-        Log.error("Repository with id " + str(repository_id) + "already has an issue tracker assigned")
-        db_session.close()
-        return
-
-    issue_tracking = IssueTracking(
-        repository=repository,
-        type=issue_tracking_type,
-        url=url,
-        username=username,
-        password=password
-    )
-    db_session.add(issue_tracking)
-
-    repository.issueTracking = issue_tracking
-    db_session.commit()
-
-    db_session.close()
-
-
-def main():
-    Config.argument_parser()
-
-    Log.info("Started. Creating database")
-    DB.create_db()
-
-    miner = RepositoryMiner(Config.repository_path)
-
-    """
-    assign_issue_tracking(
-        1,
-        Config.issue_tracking_system,
-        Config.issue_tracking_url
-    )
-
-    IssueScanner.scan_for_repository(1)"""
-
-
-main()
 
 """
                        P*,

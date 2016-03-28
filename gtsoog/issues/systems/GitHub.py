@@ -1,5 +1,3 @@
-#from json.decoder import JSONDecodeError
-
 import requests
 
 from model.objects.Issue import Issue, TYPE_BUG, TYPE_ENHANCEMENT, TYPE_OTHER
@@ -35,19 +33,19 @@ def retrieve(issue_tracking, issue_nr, existing_issue=None):
     response = requests.get(issue_url, auth=auth)
 
     if not response.status_code == 200:
-        Log.error("Issue #" + issue_nr + " could not be retrieved from " + issue_url + \
+        Log.error("Issue #" + issue_nr + " could not be retrieved from " + issue_url +
                   ". Status Code: " + str(response.status_code))
         return None
 
     try:
         issue_json = response.json()
-    except: # JSONDecodeError:
+    except ValueError:
         Log.error("Issue #" + issue_nr + " retrieved from " + issue_url + " could not be parsed to JSON")
         return None
 
     # Check for some fields to determine wether the parsed data seems to be an issue
     if 'number' not in issue_json or not str(issue_json['number']) == issue_nr or 'labels' not in issue_json:
-        Log.error("Retrieved JSON for Issue #" + issue_nr + " from " + issue_url + \
+        Log.error("Retrieved JSON for Issue #" + issue_nr + " from " + issue_url +
                   " doesn't seem to represent an actual issue.")
         return None
 
@@ -72,7 +70,8 @@ def get_issue_url(api_url, issue_nr):
     """ Returns the url to access an issue resource.
 
     Args:
-        api_url (str): The url to the git API. E.g. "github.engineering.zhaw.ch/api/v3/repos/mekesyac/LED-Cube-Prototyper"
+        api_url (str): The url to the git API.
+            E.g. "github.engineering.zhaw.ch/api/v3/repos/mekesyac/LED-Cube-Prototyper"
         issue_nr (int|str): The issue number
 
     Returns:

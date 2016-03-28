@@ -2,36 +2,74 @@ import re
 
 from sqlalchemy.orm.exc import NoResultFound
 
-from issues.systems import GitHub
+from issues.systems import GitHub, Jira
 from model import DB
 from model.objects.Issue import Issue
-from model.objects.IssueTracking import IssueTracking, TYPE_GITHUB
-from utils import Log
-
-# TODO: Relationship typ bestimmen für commit <-> issue: Associated, Closes, etc.
+from model.objects.IssueTracking import IssueTracking, TYPE_GITHUB, TYPE_JIRA
+from model.objects.Repository import Repository
+from utils import Log, Config
 
 __issue_cache = {}
 
 
-def scan_for_repository(repository_id):
+def assign_issue_tracking(repository, issue_tracking_type, url, username=None, password=None, db_session=None):
+    """ Assigns
+
+    Args:
+        repository (Repository): The repository (ORM-Object) to assign the issue tracking to.
+        issue_tracking_type (str): The issue tracking system type. Use one of the TYPE_X constants from IssueTracking.
+        url (str): The url for the issue tracking API.
+        username (str): Optional. The username for authentication.
+        password (str): Optional. The password for authentication.
+        db_session (Session): Optional. The db session to use. If not provided, a new one will be created.
+    """
+    assert isinstance(repository, Repository)
+
+    if not db_session:
+        db_session = DB.create_session()
+
+    if repository.issueTracking is not None:
+        Log.error("Repository " + repository.name + " with id " + str(
+            repository.id) + "already has an issue tracker assigned")
+        db_session.close()
+        return
+
+    issue_tracking = IssueTracking(
+        repository=repository,
+        type=issue_tracking_type,
+        url=url,
+        username=username,
+        password=password
+    )
+    db_session.add(issue_tracking)
+
+    repository.issueTracking = issue_tracking
+    db_session.commit()
+
+    db_session.close()
+
+
+def scan_for_repository(repository):
     """ Scans the issue tracking of a repository in the DB and assigns issues to commits.
 
     Iterates through all recorded commits of this repository, checks their commit message for issue references,
     trys to retrieve those issues from the associated issue tracking system and saves them in the DB.
 
     Args:
-        repository_id (int): The id of the repository to scan.
+        repository (Repository): The the repository to scan.
     """
+    assert isinstance(repository, Repository)
+
     reset_issue_cache()
 
     # get issue tracking object
-    Log.info("Retrieving IssueTracking for Repository with id " + str(repository_id))
+    Log.info("Retrieving IssueTracking for Repository " + repository.name + " with id " + str(repository.id))
     db_session = DB.create_session()
-    query = db_session.query(IssueTracking).filter(IssueTracking.repository_id == int(repository_id))
+    query = db_session.query(IssueTracking).filter(IssueTracking.repository == repository)
     try:
         issue_tracking = query.one()
     except NoResultFound:
-        Log.error("No IssueTracking-Entry found for Repository with id " + str(repository_id))
+        Log.error("No IssueTracking-Entry found for Repository " + repository.name + " with id " + str(repository.id))
         db_session.close()
         return
     Log.debug("IssueTracking found. Type: " + str(issue_tracking.type))
@@ -40,6 +78,12 @@ def scan_for_repository(repository_id):
         retrieve = GitHub.retrieve
         extract_pattern = '#[0-9]+'
         transform = lambda x: x[1:]
+    elif issue_tracking.type == TYPE_JIRA:
+        retrieve = Jira.retrieve
+        extract_pattern = Config.issue_scanner_issue_id_regex
+        if not extract_pattern:
+            extract_pattern = '[A-Z][A-Z]+-[0-9]*'  # default extract pattern, not really good
+        transform = None
     else:
         Log.error("No Implementation found for IssueTracking-Type '" + str(issue_tracking.type) + "'")
         db_session.close()
@@ -94,7 +138,7 @@ def extract_issue_ids(commit_message, search_pattern, transform=None):
         transform (function): Optional. A function to transform the extracted issues, e.g. to make "1234" from "#1234"
 
     Returns:
-
+        A list of Issue IDs
     """
     result = re.findall(search_pattern, commit_message)
     if transform:

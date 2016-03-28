@@ -15,10 +15,11 @@ from utils import Log
 from sqlalchemy import desc
 from utils import Config
 
-#TODO Nur ausgewählte Datentypen in DB
-#TODO Fixen, sodass es läuft
-#TODO refactor
-#TODO Performance Optimierung mit Threads
+
+# TODO Nur ausgewählte Datentypen in DB
+# TODO Fixen, sodass es läuft
+# TODO refactor
+# TODO Performance Optimierung mit Threads
 
 class RepositoryMiner(object):
     def __init__(self, repository_path, name=None, branch='master'):
@@ -80,15 +81,16 @@ class RepositoryMiner(object):
 
         for commit in commits:
             commit_counter += 1
-            if round((len(commits)/100)) < 1:
+            if round((len(commits) / 100)) < 1:
                 report_every_commit = 1
-            elif round((len(commits)/100)) > 100:
+            elif round((len(commits) / 100)) > 100:
                 report_every_commit = 100
             else:
-                report_every_commit = round((len(commits)/100))
+                report_every_commit = round((len(commits) / 100))
 
             if commit_counter % report_every_commit == 0:
-               Log.info(str(round((commit_counter/len(commits)*100))) + "% - processed commits: " + str(commit_counter))
+                Log.info(
+                    str(round((commit_counter / len(commits) * 100))) + "% - processed commits: " + str(commit_counter))
 
             if commit.parents:
                 previous_commit = commit.parents[0]
@@ -123,7 +125,7 @@ class RepositoryMiner(object):
 
         """
 
-        if previous_commit == None:
+        if previous_commit is None:
             first_commit = True
         else:
             first_commit = False
@@ -136,7 +138,7 @@ class RepositoryMiner(object):
         renamed_files = manipulated_files['renamed_files']
         files_diff = manipulated_files['files_diff']
 
-        #no fiiles were changed at all
+        # no files were changed at all
         if (not added_files) and (not deleted_files) and (not changed_files) and (not renamed_files) and (
                 not renamed_files):
             return
@@ -151,18 +153,18 @@ class RepositoryMiner(object):
             for file in added_files:
                 programming_language = self.__get_programming_langunage(file.path)
 
-                #skip this file because language is not interessting for us
+                # skip this file because language is not interessting for us
                 if not programming_language:
                     continue
 
-                file_diff = self.__get_diff_for_file(files_diff,str(file.path))
+                file_diff = self.__get_diff_for_file(files_diff, str(file.path))
 
-                #File could not be found in diff. hmmmmm
+                # File could not be found in diff. hmmmmm
                 if not file_diff:
                     continue
 
                 created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
-                                       programming_language)
+                                                      programming_language)
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
                 self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
@@ -171,13 +173,13 @@ class RepositoryMiner(object):
             for file in deleted_files:
                 programming_language = self.__get_programming_langunage(file.path)
 
-                #skip this file because language is not interessting for us
+                # skip this file because language is not interessting for us
                 if not programming_language:
                     continue
 
-                file_diff = self.__get_diff_for_file(files_diff,str(file.path))
+                file_diff = self.__get_diff_for_file(files_diff, str(file.path))
 
-                #File could not be found in diff. hmmmmm
+                # File could not be found in diff. hmmmmm
                 if not file_diff:
                     continue
 
@@ -193,25 +195,23 @@ class RepositoryMiner(object):
 
                 programming_language = self.__get_programming_langunage(file.path)
 
-                #skip this file because language is not interessting for us
+                # skip this file because language is not interessting for us
                 if not programming_language:
                     continue
 
-                file_diff = self.__get_diff_for_file(files_diff,str(file.path))
+                file_diff = self.__get_diff_for_file(files_diff, str(file.path))
 
-                #File could not be found in diff. hmmmmm
+                # File could not be found in diff. hmmmmm
                 if not file_diff:
                     continue
 
                 old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
-                desc(File.timestamp)).first()
+                    desc(File.timestamp)).first()
                 old_file.timestamp = timestamp
 
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, old_file.id, commit_id, 0, 0, file.size)
                 self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
-
-
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -220,18 +220,18 @@ class RepositoryMiner(object):
                 new_file = file['new_file']
 
                 programming_language = self.__get_programming_langunage(new_file.path)
-                #skip this file because language is not interessting for us
+                # skip this file because language is not interessting for us
                 if not programming_language:
                     continue
 
                 old_file = self.db_session.query(File).filter(File.path == str(old_file.path)).order_by(
                     desc(File.timestamp)).first().id
                 created_file = self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
-                                       programming_language, old_file)
+                                                      programming_language, old_file)
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, new_file.size)
 
-        #self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
+                # self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
 
     def __get_commits(self):
         """
@@ -282,15 +282,16 @@ class RepositoryMiner(object):
                 renamed_files.append({'old_file': item.a_blob, 'new_file': item.b_blob})
 
         for item in diff_with_patch:
-              # TODO here we lose file size I guess. Compare it to original file
+            # TODO here we lose file size I guess. Compare it to original file
             files_diff.append(item.diff.decode("utf-8", "ignore"))
 
-        #handle first commit
+        # handle first commit
         if previous_commit is None:
             added_files = deleted_files
             deleted_files = []
 
-        return {'added_files': added_files, 'deleted_files': deleted_files, 'changed_files': changed_files, 'renamed_files': renamed_files, 'files_diff': files_diff}
+        return {'added_files': added_files, 'deleted_files': deleted_files, 'changed_files': changed_files,
+                'renamed_files': renamed_files, 'files_diff': files_diff}
 
     def __get_diff_for_file(self, files_diff, search_filename):
 
@@ -326,7 +327,7 @@ class RepositoryMiner(object):
                 filename = diff_lines[0][6:]
 
             if filename == search_filename:
-                lines_changed = diff_lines[3]
+                # lines_changed = diff_lines[3]
                 code = diff_lines[3:]
                 return {'filename': filename, 'code': code}
 
@@ -340,7 +341,7 @@ class RepositoryMiner(object):
 
         for diff_line in code:
             # get information about line number
-            if (diff_line.startswith('@@', 0, 2)):
+            if diff_line.startswith('@@', 0, 2):
                 offset = 1
                 try:
                     if ',' in diff_line.split('+')[0]:
@@ -353,8 +354,8 @@ class RepositoryMiner(object):
                     else:
                         added_lines_counter = int(diff_line.split('+')[1].split(' ')[0])
 
-                    added_lines_counter-=offset
-                    deleted_lines_counter-=offset
+                    added_lines_counter -= offset
+                    deleted_lines_counter -= offset
                 except:
                     print(diff_line)
                     raise "Exploooode"
@@ -380,7 +381,6 @@ class RepositoryMiner(object):
 
         version.lines_added = added_lines
         version.lines_deleted = deleted_lines
-
 
     def __get_programming_langunage(self, path):
         splitted_path = path.split('.')
@@ -454,11 +454,11 @@ class RepositoryMiner(object):
         db_session.add(version_orm)
         return version_orm
 
-    def __create_new_line(self, db_session, line, line_number, type, version_id):
+    def __create_new_line(self, db_session, line, line_number, change_type, version_id):
         line_orm = Line(
             line=line,
             line_number=line_number,
-            type=type,
+            type=change_type,
             version_id=version_id
         )
         db_session.add(line_orm)

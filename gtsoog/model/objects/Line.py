@@ -8,6 +8,7 @@ Base = Base().base
 TYPE_ADDED = 1
 TYPE_DELETED = 0
 
+
 # noinspection PyClassHasNoInit
 class Line(Base):
     __tablename__ = 'line'
