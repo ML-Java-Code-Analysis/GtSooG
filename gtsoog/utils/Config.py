@@ -1,6 +1,5 @@
 import argparse
 import configparser
-import ast
 from model.objects import IssueTracking
 from utils import Log
 
@@ -18,7 +17,6 @@ number_of_threads = None
 number_of_database_sessions = None
 programming_languages = []
 issue_scanner_issue_id_regex = None
-write_lines_in_database = None
 
 DIALECT_SQLITE = 'sqlite'
 DIALECT_MYSQL = 'mysql'
@@ -113,6 +111,14 @@ def parse_config(config_file):
         except KeyError:
             raise EnvironmentError('IssueTracking URL is missing in config file')
 
+        global issue_tracking_username
+        if 'issue_tracking_username' in config['REPOSITORY']:
+            issue_tracking_username = config['REPOSITORY']['issue_tracking_username']
+
+        global issue_tracking_password
+        if 'issue_tracking_password' in config['REPOSITORY']:
+            issue_tracking_password = config['REPOSITORY']['issue_tracking_password']
+
         # REPOSITORYMINER Config
         try:
             global number_of_threads
@@ -134,12 +140,6 @@ def parse_config(config_file):
                 number_of_database_sessions = int(config['REPOSITORYMINER']['number_of_database_sessions'])
         except KeyError:
             number_of_database_sessions = 1
-
-        try:
-            global write_lines_in_database
-            write_lines_in_database = ast.literal_eval(config['REPOSITORYMINER']['write_lines_in_database'])
-        except KeyError:
-            write_lines_in_database = True
 
         # PROGRAMMINGLANGUAGES config
         try:

@@ -1,11 +1,12 @@
+from issues import IssueScanner
 from model import DB
+from repository import RepositoryMiner2
 from repository.RepositoryMiner import RepositoryMiner
 from utils import Config
 from utils import Log
 
 
 def main():
-    #
     cli_args = Config.parse_arguments()
 
     # A config file must be provided, or else nothing will work.
@@ -17,7 +18,19 @@ def main():
     Log.info("Started. Creating database")
     DB.create_db()
 
-    RepositoryMiner(Config.repository_path)
+    miner = RepositoryMiner(
+        Config.repository_path
+    )
+    repository = miner.repository_orm
+
+    IssueScanner.assign_issue_tracking(
+        repository,
+        Config.issue_tracking_system,
+        Config.issue_tracking_url,
+        Config.issue_tracking_username,
+        Config.issue_tracking_password)
+
+    IssueScanner.scan_for_repository(repository)
 
 
 main()

@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.schema import ForeignKey
 
 from model.objects.Base import Base
-from model.objects.Commit import Commit
+from model.objects.CommitIssue import CommitIssue
 
 Base = Base().base
 
@@ -16,8 +16,8 @@ TYPE_OTHER = 'OTHER'
 class Issue(Base):
     __tablename__ = 'issue'
 
-    id = Column(Integer, primary_key=True)
-    issue_tracking_id = Column(Integer, ForeignKey("issueTracking.id"))
+    id = Column(String(20), primary_key=True)
+    issue_tracking_id = Column(Integer, ForeignKey("issueTracking.id"), primary_key=True)
     title = Column(String(500))
-    commits = relationship("Commit", secondary=Commit.association_table, back_populates="issues")
+    commits = relationship("Commit", secondary=CommitIssue.__table__, back_populates="issues")
     type = Column(String(20), nullable=False)

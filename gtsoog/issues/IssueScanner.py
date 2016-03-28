@@ -25,28 +25,38 @@ def assign_issue_tracking(repository, issue_tracking_type, url, username=None, p
     """
     assert isinstance(repository, Repository)
 
+    close_db_session = False
     if not db_session:
         db_session = DB.create_session()
+        close_db_session = True
 
     if repository.issueTracking is not None:
-        Log.error("Repository " + repository.name + " with id " + str(
-            repository.id) + "already has an issue tracker assigned")
+        Log.info("Repository " + repository.name + " with id " + str(
+            repository.id) + " already has an issue tracker assigned")
+
+        repository.issueTracking.type = issue_tracking_type
+        repository.issueTracking.url = url
+        repository.issueTracking.username = username
+        repository.issueTracking.password = password
+        db_session.commit()
+    else:
+        Log.info(
+            "Creating new " + issue_tracking_type + " IssueTracking for Repository " + repository.name +
+            " with id " + str(repository.id))
+        issue_tracking = IssueTracking(
+            repository=repository,
+            type=issue_tracking_type,
+            url=url,
+            username=username,
+            password=password
+        )
+        db_session.add(issue_tracking)
+
+        repository.issueTracking = issue_tracking
+        db_session.commit()
+
+    if close_db_session:
         db_session.close()
-        return
-
-    issue_tracking = IssueTracking(
-        repository=repository,
-        type=issue_tracking_type,
-        url=url,
-        username=username,
-        password=password
-    )
-    db_session.add(issue_tracking)
-
-    repository.issueTracking = issue_tracking
-    db_session.commit()
-
-    db_session.close()
 
 
 def scan_for_repository(repository):
