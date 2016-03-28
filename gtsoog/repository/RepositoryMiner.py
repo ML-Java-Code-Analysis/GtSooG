@@ -153,59 +153,18 @@ class RepositoryMiner(object):
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
 
                 # skip this file because language is not interessting for us
-
                 if not programming_language:
                     continue
-
-                # File could not be found in diff. hmmmmm
-                if Config.write_lines_in_database:
-                    file_diff = self.__get_diff_for_file(files_diff, str(file.path))
-                    if not file_diff:
-                        continue
-                    self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
+                self.__process_file_diff(db_session, file, files_diff, created_version, first_commit)
 
         if deleted_files:
             for file in deleted_files:
-                programming_language = self.__get_programming_langunage(file.path)
-
-                old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
-                    desc(File.timestamp)).first()
-                old_file.timestamp = timestamp
-                db_session.commit()
-                created_version = self.__create_new_version(db_session, old_file.id, commit_id, 0, 0, file.size)
-
-                # skip this file because language is not interessting for us
-                if not programming_language:
-                    continue
-
-                # File could not be found in diff. hmmmmm
-                if Config.write_lines_in_database:
-                    file_diff = self.__get_diff_for_file(files_diff, str(file.path))
-                    if not file_diff:
-                        continue
-                    self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
+                self.__process_deleted_or_changed_file(db_session, commit_id, file, files_diff, first_commit, timestamp)
 
         if changed_files:
             for file in changed_files:
-                programming_language = self.__get_programming_langunage(file.path)
+                self.__process_deleted_or_changed_file(db_session, commit_id, file, files_diff, first_commit, timestamp)
 
-                old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
-                    desc(File.timestamp)).first()
-                old_file.timestamp = timestamp
-
-                db_session.commit()
-                created_version = self.__create_new_version(db_session, old_file.id, commit_id, 0, 0, file.size)
-
-                # skip this file because language is not interessting for us
-                if not programming_language:
-                    continue
-
-                if Config.write_lines_in_database:
-                    # File could not be found in diff. hmmmmm
-                    file_diff = self.__get_diff_for_file(files_diff, str(file.path))
-                    if not file_diff:
-                        continue
-                    self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -222,6 +181,31 @@ class RepositoryMiner(object):
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, new_file.size)
 
+    def __process_deleted_or_changed_file(self, db_session, commit_id, file, files_diff, first_commit, timestamp):
+        programming_language = self.__get_programming_langunage(file.path)
+
+        created_version = self.__update_file_timestamp_and_create_version(db_session, commit_id, file, timestamp)
+
+        # skip this file because language is not interessting for us
+        if not programming_language:
+            return
+        self.__process_file_diff(db_session, file, files_diff, created_version, first_commit)
+
+    def __update_file_timestamp_and_create_version(self, db_session, commit_id, file, timestamp):
+        model_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
+            desc(File.timestamp)).first()
+        model_file.timestamp = timestamp
+        db_session.commit()
+        created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
+        return created_version
+
+    def __process_file_diff(self, db_session, file, files_diff, created_version, first_commit):
+        if Config.write_lines_in_database:
+            # File could not be found in diff. hmmmmm
+            file_diff = self.__get_diff_for_file(files_diff, str(file.path))
+            if not file_diff:
+                return
+            self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
 
     def __get_commits(self):
         """
