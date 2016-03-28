@@ -1,6 +1,6 @@
 from issues import IssueScanner
 from model import DB
-from repository import RepositoryMiner2
+from repository import RepositoryMiner
 from repository.RepositoryMiner import RepositoryMiner
 from utils import Config
 from utils import Log
