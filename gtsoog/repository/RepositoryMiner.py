@@ -77,20 +77,13 @@ class RepositoryMiner(object):
 
         previous_commit = None
         threads = []
-        commit_counter = 0
-
-        for commit in commits:
-            commit_counter += 1
-            if round((len(commits) / 100)) < 1:
-                report_every_commit = 1
-            elif round((len(commits) / 100)) > 100:
-                report_every_commit = 100
-            else:
-                report_every_commit = round((len(commits) / 100))
-
-            if commit_counter % report_every_commit == 0:
-                Log.info(
-                    str(round((commit_counter / len(commits) * 100))) + "% - processed commits: " + str(commit_counter))
+        log_interval = 1
+        if len(commits) > 1000:
+            log_interval = 100
+        for i, commit in enumerate(commits):
+            if i % log_interval == 0:
+                prc = i / len(commits) * 100
+                Log.info("{0:0.2f}% - processed commits: {1}".format(prc, i))
 
             if commit.parents:
                 previous_commit = commit.parents[0]
@@ -243,7 +236,6 @@ class RepositoryMiner(object):
         return commits
 
     def __get_changed_files(self, commit, previous_commit):
-
         """
 
         Args:
