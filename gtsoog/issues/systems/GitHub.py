@@ -77,7 +77,7 @@ def get_issue_url(api_url, issue_nr):
     Returns:
         str: The url to access the issue resource via REST
     """
-    return 'https://{url}/issues/{number}'.format(
+    return r'https://{url}/issues/{number}'.format(
         url=api_url,
         number=issue_nr
     )
