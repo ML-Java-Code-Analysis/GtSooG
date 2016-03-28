@@ -7,8 +7,6 @@ from utils import Log
 repository_path = None
 issue_tracking_system = None
 issue_tracking_url = None
-issue_tracking_username = None
-issue_tracking_password = None
 database_dialect = None
 database_name = None
 database_user = None
@@ -102,7 +100,7 @@ def parse_config(config_file):
             global issue_tracking_system
             issue_tracking_system = config['REPOSITORY']['issue_tracking_system']
             if (issue_tracking_system != str(IssueTracking.TYPE_GITHUB)) and (
-                    issue_tracking_system != str(IssueTracking.TYPE_JIRA)):
+                issue_tracking_system != str(IssueTracking.TYPE_JIRA)):
                 raise EnvironmentError('Unsupported issue tracking system. Use GITHUB or JIRA')
         except KeyError:
             raise EnvironmentError('Issue Tracking System is missing in config file')
@@ -121,6 +119,7 @@ def parse_config(config_file):
         if 'issue_tracking_password' in config['REPOSITORY']:
             issue_tracking_password = config['REPOSITORY']['issue_tracking_password']
 
+        # REPOSITORYMINER Config
         try:
             global number_of_threads
             if database_dialect == str(DIALECT_SQLITE):

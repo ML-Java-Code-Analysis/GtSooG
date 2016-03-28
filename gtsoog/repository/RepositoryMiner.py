@@ -11,6 +11,7 @@ from model.objects.Repository import Repository
 from model.objects.Commit import Commit
 from model.objects.File import File
 from model.objects.Version import Version
+from model.objects.Line import MAX_LINE_LENGTH
 from utils import Log
 from sqlalchemy import desc
 from utils import Config
@@ -146,57 +147,47 @@ class RepositoryMiner(object):
             for file in added_files:
                 programming_language = self.__get_programming_langunage(file.path)
 
-                # skip this file because language is not interessting for us
-                if not programming_language:
-                    continue
-
-                file_diff = self.__get_diff_for_file(files_diff, str(file.path))
-
-                # File could not be found in diff. hmmmmm
-                if not file_diff:
-                    continue
-
                 created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
                                                       programming_language)
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
-                self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
+
+                # skip this file because language is not interessting for us
+
+                if not programming_language:
+                    continue
+
+                # File could not be found in diff. hmmmmm
+                if Config.write_lines_in_database:
+                    file_diff = self.__get_diff_for_file(files_diff, str(file.path))
+                    if not file_diff:
+                        continue
+                    self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
 
         if deleted_files:
             for file in deleted_files:
                 programming_language = self.__get_programming_langunage(file.path)
 
-                # skip this file because language is not interessting for us
-                if not programming_language:
-                    continue
-
-                file_diff = self.__get_diff_for_file(files_diff, str(file.path))
-
-                # File could not be found in diff. hmmmmm
-                if not file_diff:
-                    continue
-
                 old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
                     desc(File.timestamp)).first()
                 old_file.timestamp = timestamp
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, old_file.id, commit_id, 0, 0, file.size)
-                self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
+
+                # skip this file because language is not interessting for us
+                if not programming_language:
+                    continue
+
+                # File could not be found in diff. hmmmmm
+                if Config.write_lines_in_database:
+                    file_diff = self.__get_diff_for_file(files_diff, str(file.path))
+                    if not file_diff:
+                        continue
+                    self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
 
         if changed_files:
             for file in changed_files:
-
                 programming_language = self.__get_programming_langunage(file.path)
-
-                # skip this file because language is not interessting for us
-                if not programming_language:
-                    continue
-
-                file_diff = self.__get_diff_for_file(files_diff, str(file.path))
-
-                # File could not be found in diff. hmmmmm
-                if not file_diff:
-                    continue
 
                 old_file = db_session.query(File).filter(File.path == str(file.path)).order_by(
                     desc(File.timestamp)).first()
@@ -204,7 +195,17 @@ class RepositoryMiner(object):
 
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, old_file.id, commit_id, 0, 0, file.size)
-                self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
+
+                # skip this file because language is not interessting for us
+                if not programming_language:
+                    continue
+
+                if Config.write_lines_in_database:
+                    # File could not be found in diff. hmmmmm
+                    file_diff = self.__get_diff_for_file(files_diff, str(file.path))
+                    if not file_diff:
+                        continue
+                    self.__process_code_lines(db_session, first_commit, file_diff['code'], created_version)
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -213,9 +214,6 @@ class RepositoryMiner(object):
                 new_file = file['new_file']
 
                 programming_language = self.__get_programming_langunage(new_file.path)
-                # skip this file because language is not interessting for us
-                if not programming_language:
-                    continue
 
                 old_file = self.db_session.query(File).filter(File.path == str(old_file.path)).order_by(
                     desc(File.timestamp)).first().id
@@ -224,7 +222,6 @@ class RepositoryMiner(object):
                 db_session.commit()
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, new_file.size)
 
-                # self.__process_version(db_session, files_diff, timestamp, commit_id, commit_files_size)
 
     def __get_commits(self):
         """
@@ -360,11 +357,11 @@ class RepositoryMiner(object):
             if diff_line.startswith('-', 0, 1):
                 # first commit deleted lines = added lines
                 if first_commit:
-                    self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
+                    self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], added_lines_counter, TYPE_ADDED, version.id)
                     added_lines += 1
                     deleted_lines_counter -= 1
                 else:
-                    self.__create_new_line(db_session, diff_line[1:], deleted_lines_counter, TYPE_DELETED, version.id)
+                    self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], deleted_lines_counter, TYPE_DELETED, version.id)
                     deleted_lines += 1
                     added_lines_counter -= 1
 

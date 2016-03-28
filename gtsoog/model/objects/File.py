@@ -17,6 +17,6 @@ class File(Base):
     repository_id = Column(Integer, ForeignKey("repository.id"))
     path = Column(String(500), nullable=False)
     timestamp = Column(DateTime, nullable=False)
-    language = Column(String(20), nullable=False)
+    language = Column(String(20))
 
     __table_args__ = (UniqueConstraint('path', 'timestamp'), )
