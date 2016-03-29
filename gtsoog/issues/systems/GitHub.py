@@ -1,3 +1,4 @@
+# coding=utf-8
 import requests
 
 from model.objects.Issue import Issue, TYPE_BUG, TYPE_ENHANCEMENT, TYPE_OTHER

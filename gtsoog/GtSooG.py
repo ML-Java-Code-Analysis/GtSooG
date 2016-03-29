@@ -1,6 +1,7 @@
+#!/usr/bin/python
+# coding=utf-8
 from issues import IssueScanner
 from model import DB
-from repository import RepositoryMiner
 from repository.RepositoryMiner import RepositoryMiner
 from utils import Config
 from utils import Log

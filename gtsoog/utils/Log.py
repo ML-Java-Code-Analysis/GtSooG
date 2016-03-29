@@ -1,3 +1,4 @@
+# coding=utf-8
 from datetime import datetime
 
 MODE_PRINT = 0
