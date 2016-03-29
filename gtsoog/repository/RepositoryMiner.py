@@ -187,7 +187,7 @@ class RepositoryMiner(object):
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, new_file.size)
 
         if not commit_processing_successful and self.NUMBER_OF_THREADS:
-            Log.warning("Could not process commit " + str(commit.id) + ". Files affected: " + str(manipulated_files))
+            Log.warning("Could not process commit " + str(commit) + ". Files affected: " + str(manipulated_files))
 
         db_session.commit()
 
