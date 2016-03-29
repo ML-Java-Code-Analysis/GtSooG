@@ -2,3 +2,4 @@
 src/__pycache__/
 *.pyc
 *.db
+gtsoog/gtsoog.cfg

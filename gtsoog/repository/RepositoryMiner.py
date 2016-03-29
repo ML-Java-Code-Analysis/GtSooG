@@ -154,17 +154,17 @@ class RepositoryMiner(object):
         if added_files:
             # added_files_thread = threading.Thread(target=self.__thread_helper_added_file, args=(commit_id, added_files, files_diff, first_commit, timestamp))
             # added_files_thread.start()
-            self.__thread_helper_added_file(commit_id, added_files, files_diff, first_commit, timestamp)
+            self.__thread_helper_added_file(commit_id, added_files, files_diff, first_commit, timestamp, db_session=db_session)
 
         if deleted_files:
             # deleted_files_thread = threading.Thread(target=self.__thread_helper_deleted_or_changed_file, args=(commit_id, deleted_files, files_diff, first_commit, timestamp))
             # deleted_files_thread.start()
-            self.__thread_helper_deleted_or_changed_file(commit_id, deleted_files, files_diff, first_commit, timestamp)
+            self.__thread_helper_deleted_or_changed_file(commit_id, deleted_files, files_diff, first_commit, timestamp, db_session=db_session)
 
         if changed_files:
             # changed_files_thread = threading.Thread(target=self.__thread_helper_deleted_or_changed_file, args=(commit_id, changed_files, files_diff, first_commit, timestamp))
             # changed_files_thread.start()
-            self.__thread_helper_deleted_or_changed_file(commit_id, changed_files, files_diff, first_commit, timestamp)
+            self.__thread_helper_deleted_or_changed_file(commit_id, changed_files, files_diff, first_commit, timestamp, db_session=db_session)
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -179,6 +179,7 @@ class RepositoryMiner(object):
 
                 if not model_file:
                     commit_processing_successful = False
+                    print("renamed failed")
                     break
 
                 created_file = self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
@@ -187,7 +188,7 @@ class RepositoryMiner(object):
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, new_file.size)
 
         if not commit_processing_successful and self.NUMBER_OF_THREADS:
-            Log.warning("Could not process commit " + str(commit) + ". Files affected: " + str(manipulated_files))
+            Log.warning("Could not process commit " + str(commit_id) + ". Files added: " + str(manipulated_files['added_files']) + " files deleted: " + str(manipulated_files['deleted_files']) + " files changed: " + str(manipulated_files['changed_files']) + " files renamed: " + str(manipulated_files['renamed_files']))
 
         db_session.commit()
 
@@ -403,7 +404,7 @@ class RepositoryMiner(object):
                     raise "Exploooode"
 
             if diff_line.startswith('+', 0, 1):
-                self.__create_new_line(db_session, diff_line[1:], added_lines_counter, TYPE_ADDED, version.id)
+                self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], added_lines_counter, TYPE_ADDED, version.id)
                 added_lines += 1
                 deleted_lines_counter -= 1
 
