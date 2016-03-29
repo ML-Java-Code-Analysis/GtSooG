@@ -17,6 +17,7 @@ from utils import Log
 from sqlalchemy import desc
 from utils import Config
 
+
 # TODO Performance Optimierung mit Threads
 
 class RepositoryMiner(object):
@@ -113,8 +114,14 @@ class RepositoryMiner(object):
         Returns:
 
         """
+        db_session_local = None
         if not db_session:
+            db_session_local = True
             db_session = DB.create_session()
+
+        added_files_thread = None
+        changed_files_thread = None
+        deleted_files_thread = None
 
         commit_processing_successful = True
 
@@ -144,30 +151,19 @@ class RepositoryMiner(object):
         self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit_time)
 
         if added_files:
-            for file in added_files:
-                programming_language = self.__get_programming_langunage(file.path)
-
-                created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
-                                                      programming_language)
-                db_session.commit()
-                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
-
-                # skip this file because language is not interessting for us
-                if not programming_language:
-                    continue
-                self.__process_file_diff(db_session, file, files_diff, created_version, first_commit)
+            # added_files_thread = threading.Thread(target=self.__thread_helper_added_file, args=(commit_id, added_files, files_diff, first_commit, timestamp))
+            # added_files_thread.start()
+            self.__thread_helper_added_file(commit_id, added_files, files_diff, first_commit, timestamp)
 
         if deleted_files:
-            for file in deleted_files:
-                commit_processing_successful = self.__process_deleted_or_changed_file(db_session, commit_id, file, files_diff, first_commit, timestamp)
-                if not commit_processing_successful:
-                    break
+            # deleted_files_thread = threading.Thread(target=self.__thread_helper_deleted_or_changed_file, args=(commit_id, deleted_files, files_diff, first_commit, timestamp))
+            # deleted_files_thread.start()
+            self.__thread_helper_deleted_or_changed_file(commit_id, deleted_files, files_diff, first_commit, timestamp)
 
         if changed_files:
-            for file in changed_files:
-                commit_processing_successful = self.__process_deleted_or_changed_file(db_session, commit_id, file, files_diff, first_commit, timestamp)
-                if not commit_processing_successful:
-                    break
+            # changed_files_thread = threading.Thread(target=self.__thread_helper_deleted_or_changed_file, args=(commit_id, changed_files, files_diff, first_commit, timestamp))
+            # changed_files_thread.start()
+            self.__thread_helper_deleted_or_changed_file(commit_id, changed_files, files_diff, first_commit, timestamp)
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -193,7 +189,52 @@ class RepositoryMiner(object):
             Log.warning("Could not process commit " + str(commit.id) + ". Files affected: " + str(manipulated_files))
 
         db_session.commit()
-        if db_session != self.db_session:
+
+        if added_files_thread:
+            added_files_thread.join()
+        if changed_files_thread:
+            changed_files_thread.join()
+        if deleted_files_thread:
+            deleted_files_thread.join()
+
+        if db_session_local:
+            db_session.close()
+
+    def __thread_helper_added_file(self, commit_id, files, files_diff, first_commit, timestamp, db_session=None):
+        db_session_local = None
+        if not db_session:
+            db_session_local = True
+            db_session = DB.create_session()
+        for file in files:
+            programming_language = self.__get_programming_langunage(file.path)
+
+            created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
+                                                  programming_language)
+            db_session.commit()
+            created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
+
+            # skip this file because language is not interessting for us
+            if not programming_language:
+                continue
+            self.__process_file_diff(db_session, file, files_diff, created_version, first_commit)
+
+        if db_session_local:
+            db_session.close()
+
+    def __thread_helper_deleted_or_changed_file(self, commit_id, files, files_diff, first_commit, timestamp,
+                                                db_session=None):
+        db_session_local = None
+        if not db_session:
+            db_session_local = True
+            db_session = DB.create_session()
+        for file in files:
+            commit_processing_successful = self.__process_deleted_or_changed_file(db_session, commit_id, file,
+                                                                                  files_diff, first_commit, timestamp)
+            if not commit_processing_successful:
+                Log.warning("Could not process commit " + str(commit_id) + ". Files affected: " + str(files))
+                return
+
+        if db_session_local:
             db_session.close()
 
     def __process_deleted_or_changed_file(self, db_session, commit_id, file, files_diff, first_commit, timestamp):
@@ -201,7 +242,7 @@ class RepositoryMiner(object):
 
         created_version = self.__update_file_timestamp_and_create_version(db_session, commit_id, file, timestamp)
 
-        #print(created_version)
+        # print(created_version)
 
         # File is not yet in database
         if not created_version:
@@ -368,11 +409,13 @@ class RepositoryMiner(object):
             if diff_line.startswith('-', 0, 1):
                 # first commit deleted lines = added lines
                 if first_commit:
-                    self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], added_lines_counter, TYPE_ADDED, version.id)
+                    self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], added_lines_counter, TYPE_ADDED,
+                                           version.id)
                     added_lines += 1
                     deleted_lines_counter -= 1
                 else:
-                    self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], deleted_lines_counter, TYPE_DELETED, version.id)
+                    self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], deleted_lines_counter,
+                                           TYPE_DELETED, version.id)
                     deleted_lines += 1
                     added_lines_counter -= 1
 
