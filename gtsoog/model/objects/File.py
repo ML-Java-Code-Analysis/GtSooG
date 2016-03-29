@@ -16,7 +16,7 @@ class File(Base):
     precursor_file_id = Column(String(36), ForeignKey('file.id'))
     precursor_file = relationship("File")
     repository_id = Column(Integer, ForeignKey("repository.id"))
-    path = Column(String(382), nullable=False)
+    path = Column(String(255), nullable=False)
     timestamp = Column(DateTime, nullable=False)
     language = Column(String(20))
 
