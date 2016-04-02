@@ -208,7 +208,7 @@ class RepositoryMiner(object):
             db_session.close()
 
     def __thread_helper_added_file(self, commit_id, files, files_diff, timestamp, db_session=None):
-        db_session_local = None
+        db_session_local = False
         if not db_session:
             db_session_local = True
             db_session = DB.create_session()
@@ -218,7 +218,11 @@ class RepositoryMiner(object):
             created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
                                                   programming_language)
             db_session.commit()
-            created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
+            try:
+                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
+            except ValueError:
+                Log.Error("GityPython could not determine file size. Affected file: " + created_file.path + " Commit: " + commit_id)
+                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, -1)
 
             # skip this file because language is not interessting for us
             if not programming_language:
@@ -230,7 +234,7 @@ class RepositoryMiner(object):
 
     def __thread_helper_deleted_or_changed_file(self, commit_id, files, files_diff, timestamp,
                                                 db_session=None):
-        db_session_local = None
+        db_session_local = False
         if not db_session:
             db_session_local = True
             db_session = DB.create_session()
@@ -269,7 +273,11 @@ class RepositoryMiner(object):
 
         model_file.timestamp = timestamp
         db_session.commit()
-        created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
+        try:
+            created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
+        except ValueError:
+            Log.Error("GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
+            created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, -1)
         return created_version
 
     def __process_file_diff(self, db_session, file, files_diff, created_version):
