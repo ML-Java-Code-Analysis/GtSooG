@@ -8,12 +8,11 @@ from uuid import uuid4 as uuid
 from git import Repo
 
 from model import DB
-from model.objects.Line import Line, TYPE_ADDED, TYPE_DELETED
+from model.objects.Line import Line
 from model.objects.Repository import Repository
 from model.objects.Commit import Commit
 from model.objects.File import File
 from model.objects.Version import Version
-from model.objects.Line import MAX_LINE_LENGTH
 from utils import Log
 from sqlalchemy import desc
 from utils import Config
@@ -187,7 +186,6 @@ class RepositoryMiner(object):
                 created_file = self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
                                                       programming_language, model_file.id)
                 db_session.commit()
-                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, new_file.size)
 
         if not commit_processing_successful and self.NUMBER_OF_THREADS:
             Log.warning("Could not process commit " + str(commit_id) + ". Files added: " + str(manipulated_files['added_files']) + " files deleted: " + str(manipulated_files['deleted_files']) + " files changed: " + str(manipulated_files['changed_files']) + " files renamed: " + str(manipulated_files['renamed_files']))
@@ -396,13 +394,13 @@ class RepositoryMiner(object):
                     raise "Diff Parse Error"
 
             if diff_line.startswith('+', 0, 1):
-                self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH], deleted_lines_counter, TYPE_DELETED, version.id)
+                self.__create_new_line(db_session, diff_line, deleted_lines_counter, Line.TYPE_DELETED, version.id)
                 deleted_lines += 1
                 added_lines_counter -= 1
 
             if diff_line.startswith('-', 0, 1):
-                self.__create_new_line(db_session, diff_line[1:MAX_LINE_LENGTH],added_lines_counter,
-                                           TYPE_ADDED, version.id)
+                self.__create_new_line(db_session, diff_line,added_lines_counter,
+                                           Line.TYPE_ADDED, version.id)
                 added_lines += 1
                 deleted_lines_counter -= 1
 
@@ -431,7 +429,7 @@ class RepositoryMiner(object):
             # create new repository
             self.repository_orm = Repository(
                 name=name,
-                url=repository_url
+                url=repository_url[0:Repository.MAX_URL_LENGTH]
             )
             db_session.add(self.repository_orm)
             db_session.flush()
@@ -450,7 +448,7 @@ class RepositoryMiner(object):
             commit_orm = Commit(
                 id=commit_id,
                 repository_id=repository_id,
-                message=message,
+                message=message[0:Commit.MAX_MESSAGE_LENGTH],
                 timestamp=timestamp
             )
             db_session.add(commit_orm)
@@ -461,7 +459,7 @@ class RepositoryMiner(object):
         if not file_orm:
             file_orm = File(
                 id=uuid().hex,
-                path=file_path,
+                path=file_path[0:Line.MAX_PATH_LENGTH],
                 timestamp=timestamp,
                 repository_id=repository_id,
                 precursor_file_id=precursor_file_id,
@@ -486,7 +484,7 @@ class RepositoryMiner(object):
 
     def __create_new_line(self, db_session, line, line_number, change_type, version_id):
         line_orm = Line(
-            line=line,
+            line=line[0:Line.MAX_LINE_LENGTH],
             line_number=line_number,
             type=change_type,
             version_id=version_id

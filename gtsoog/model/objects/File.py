@@ -7,6 +7,8 @@ from model.objects.Base import Base
 
 Base = Base().base
 
+MAX_PATH_LENGTH = 500
+
 # noinspection PyClassHasNoInit
 class File(Base):
     __tablename__ = 'file'
@@ -15,7 +17,7 @@ class File(Base):
     precursor_file_id = Column(String(36), ForeignKey('file.id'))
     precursor_file = relationship("File")
     repository_id = Column(Integer, ForeignKey("repository.id"))
-    path = Column(String(500), nullable=False)
+    path = Column(String(MAX_PATH_LENGTH+1), nullable=False)
     timestamp = Column(DateTime, nullable=False)
     language = Column(String(20))
 

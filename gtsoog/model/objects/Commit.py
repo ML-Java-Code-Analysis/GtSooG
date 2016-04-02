@@ -7,6 +7,7 @@ from model.objects.Base import Base
 from model.objects.CommitIssue import CommitIssue
 
 Base = Base().base
+MAX_MESSAGE_LENGTH = 3000
 
 
 # noinspection PyClassHasNoInit
@@ -15,6 +16,6 @@ class Commit(Base):
 
     id = Column(String(40), primary_key=True)
     repository_id = Column(Integer, ForeignKey('repository.id'))
-    message = Column(String(3000), nullable=False)  # TODO: Is length enough?
+    message = Column(String(MAX_MESSAGE_LENGTH+1), nullable=False)
     timestamp = Column(DateTime, nullable=False)
     issues = relationship("Issue", secondary=CommitIssue.__table__, back_populates="commits")

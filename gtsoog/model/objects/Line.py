@@ -16,7 +16,7 @@ class Line(Base):
     __tablename__ = 'line'
 
     id = Column(Integer, primary_key=True)
-    line = Column(String(MAX_LINE_LENGTH))
+    line = Column(String(MAX_LINE_LENGTH+1))
     line_number = Column(Integer)
     type = Column(Integer)
     version_id = Column(String(36), ForeignKey("version.id"))
