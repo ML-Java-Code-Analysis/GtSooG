@@ -10,7 +10,7 @@ from git import Repo
 from model import DB
 from model.objects.Line import Line, MAX_LINE_LENGTH, TYPE_ADDED, TYPE_DELETED
 from model.objects.Repository import Repository, MAX_URL_LENGTH
-from model.objects.Commit import Commit, MAX_MESSAGE_LENGTH
+from model.objects.Commit import Commit, MAX_MESSAGE_LENGTH, MAX_AUTHOR_LENGTH
 from model.objects.File import File, MAX_PATH_LENGTH
 from model.objects.Version import Version
 from utils import Log
@@ -151,7 +151,7 @@ class RepositoryMiner(object):
         timestamp = commit_time
         commit_id = str(commit)
 
-        self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit_time)
+        self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit.author.name, commit_time)
 
         if added_files:
             # added_files_thread = threading.Thread(target=self.__thread_helper_added_file, args=(commit_id, added_files, files_diff, timestamp))
@@ -445,7 +445,7 @@ class RepositoryMiner(object):
 
         return self.repository_orm.id
 
-    def __create_new_commit(self, db_session, commit_id, repository_id, message, timestamp):
+    def __create_new_commit(self, db_session, commit_id, repository_id, message, author, timestamp):
         # Try to retrieve the commit record, if not found a new one is created.
         # TODO: Now that existing commits are skipped anyway, this query could be removed for performance
         commit_orm = db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
@@ -453,6 +453,7 @@ class RepositoryMiner(object):
             commit_orm = Commit(
                 id=commit_id,
                 repository_id=repository_id,
+                author=author[0:MAX_AUTHOR_LENGTH],
                 message=message[0:MAX_MESSAGE_LENGTH],
                 timestamp=timestamp
             )
