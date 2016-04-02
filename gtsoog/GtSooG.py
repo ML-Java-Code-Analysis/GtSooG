@@ -19,8 +19,11 @@ def main():
     Log.info("Started. Creating database")
     DB.create_db()
 
+    db_session = DB.create_session()
+
     miner = RepositoryMiner(
-        Config.repository_path
+        Config.repository_path,
+        db_session=db_session
     )
     repository = miner.repository_orm
 
@@ -29,7 +32,7 @@ def main():
         Config.issue_tracking_system,
         Config.issue_tracking_url,
         Config.issue_tracking_username,
-        Config.issue_tracking_password)
+        Config.issue_tracking_password, db_session=db_session)
 
     IssueScanner.scan_for_repository(repository)
 

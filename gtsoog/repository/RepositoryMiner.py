@@ -22,7 +22,7 @@ from utils import Config
 # TODO Performance Optimierung mit Threads
 
 class RepositoryMiner(object):
-    def __init__(self, repository_path, name=None, branch='master'):
+    def __init__(self, repository_path, name=None, db_session=None, branch='master'):
         """ Initialize the Repository Miner
 
         Args:
@@ -39,9 +39,8 @@ class RepositoryMiner(object):
         self.NUMBER_OF_DBSESSIONS = Config.number_of_database_sessions
         self.EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-        self.db_session = None
         self.thread_db_sessions = {}
-        self.init_db_sessions()
+        self.init_db_sessions(db_session)
 
         self.existing_commit_ids = set()
         self.repository_id = self.__create_new_repository(self.db_session, name, repository_path)
@@ -50,12 +49,19 @@ class RepositoryMiner(object):
         commits = self.__get_commits()
         self.iterate_commits(commits)
 
-        self.close_all_db_sessions()
+        #Leave open for the moment
+        #self.close_all_db_sessions()
 
-    def init_db_sessions(self):
-        self.db_session = DB.create_session()
-        for i in range(self.NUMBER_OF_DBSESSIONS):
-            self.thread_db_sessions[i] = (False, DB.create_session())
+    def init_db_sessions(self, db_session):
+        if db_session == None:
+            self.db_session = DB.create_session()
+        else:
+            self.db_session = db_session
+            for i in range(self.NUMBER_OF_DBSESSIONS):
+                self.thread_db_sessions[i] = (False, DB.create_session())
+
+    def get_db_session(self):
+        return self.db_session
 
     def close_all_db_sessions(self):
         self.db_session.close()
@@ -100,7 +106,6 @@ class RepositoryMiner(object):
                 else:
                     self.__process_commit(commit, previous_commit, db_session=self.db_session)
                     self.db_session.commit()
-        self.db_session.close()
 
     def __get_db_session(self):
         for i in range(self.NUMBER_OF_DBSESSIONS):
