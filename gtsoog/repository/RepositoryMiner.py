@@ -221,7 +221,7 @@ class RepositoryMiner(object):
             try:
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
             except ValueError:
-                Log.Error("GityPython could not determine file size. Affected file: " + created_file.path + " Commit: " + commit_id)
+                Log.error("GityPython could not determine file size. Affected file: " + created_file.path + " Commit: " + commit_id)
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, -1)
 
             # skip this file because language is not interessting for us
@@ -276,7 +276,7 @@ class RepositoryMiner(object):
         try:
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
         except ValueError:
-            Log.Error("GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
+            Log.error("GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, -1)
         return created_version
 
