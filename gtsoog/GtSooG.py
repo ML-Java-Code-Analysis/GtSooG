@@ -5,8 +5,7 @@ from model import DB
 from repository.RepositoryMiner import RepositoryMiner
 from utils import Config
 from utils import Log
-import signal
-import sys
+from utils import SignalHandler
 
 def main():
     cli_args = Config.parse_arguments()
@@ -38,11 +37,7 @@ def main():
     IssueScanner.scan_for_repository(repository)
     db_session.close()
 
-def signal_handler(signal, frame):
-        print('You pressed Ctrl+C!')
-        sys.exit(0)
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
+SignalHandler.register_signal_handler()
 main()
 
 """
