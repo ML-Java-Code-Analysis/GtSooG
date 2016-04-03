@@ -18,5 +18,5 @@ class Version(Base):
     commit_id = Column(String(40), ForeignKey("commit.id"))
     lines_added = Column(Integer, nullable=False)
     lines_deleted = Column(Integer, nullable=False)
-    file_size = Column(Integer, nullable=False)
+    file_size = Column(Integer)
     lines = relationship("Line")

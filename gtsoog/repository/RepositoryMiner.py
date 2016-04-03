@@ -222,7 +222,7 @@ class RepositoryMiner(object):
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
             except ValueError:
                 Log.error("GityPython could not determine file size. Affected file: " + created_file.path + " Commit: " + commit_id)
-                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, -1)
+                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, None)
 
             # skip this file because language is not interessting for us
             if not programming_language:
@@ -277,7 +277,7 @@ class RepositoryMiner(object):
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
         except ValueError:
             Log.error("GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
-            created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, -1)
+            created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, None)
         return created_version
 
     def __process_file_diff(self, db_session, file, files_diff, created_version):
