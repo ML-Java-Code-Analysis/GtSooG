@@ -15,7 +15,6 @@ from model.objects.Version import Version
 from utils import Log
 from sqlalchemy import desc
 from utils import Config
-from utils.SignalHandler import shutdown
 
 # TODO Performance Optimierung mit Threads
 
@@ -111,10 +110,6 @@ class RepositoryMiner(object):
                 previous_commit = commit.parents[0]
             else:
                 previous_commit = self.EMPTY_TREE_SHA
-
-            if shutdown:
-                self.close_all_db_sessions()
-                return
 
             if (len(commit.parents) <= 1) and (not self.__commit_exists(str(commit))):
                 if threading.active_count() < self.NUMBER_OF_THREADS:

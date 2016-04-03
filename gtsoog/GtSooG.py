@@ -5,7 +5,6 @@ from model import DB
 from repository.RepositoryMiner import RepositoryMiner
 from utils import Config
 from utils import Log
-from utils import SignalHandler
 
 def main():
     cli_args = Config.parse_arguments()
@@ -37,7 +36,6 @@ def main():
     IssueScanner.scan_for_repository(repository)
     db_session.close()
 
-SignalHandler.register_signal_handler()
 main()
 
 """
