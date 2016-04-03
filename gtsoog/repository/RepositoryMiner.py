@@ -89,7 +89,7 @@ class RepositoryMiner(object):
         self.existing_commit_ids = set(
             [t[0] for t in self.db_session.query(Commit.id).filter(Commit.repository_id == repository_id).all()])
 
-    def commit_exists(self, commit_id):
+    def __commit_exists(self, commit_id):
         return commit_id in self.existing_commit_ids
 
     def iterate_commits(self, commits):
@@ -112,7 +112,7 @@ class RepositoryMiner(object):
             else:
                 previous_commit = self.EMPTY_TREE_SHA
 
-            if len(commit.parents) <= 1 or self.commit_exists(str(commit)):
+            if (len(commit.parents) <= 1) and (not self.__commit_exists(str(commit))):
                 if threading.active_count() < self.NUMBER_OF_THREADS:
                     t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit))
                     threads.append(t)
@@ -239,7 +239,7 @@ class RepositoryMiner(object):
             try:
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
             except ValueError:
-                Log.error(
+                Log.warning(
                     "GityPython could not determine file size. Affected file: " + created_file.path + " Commit: " + commit_id)
                 created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, None)
 
@@ -332,7 +332,7 @@ class RepositoryMiner(object):
         try:
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
         except ValueError:
-            Log.error("GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
+            Log.warning("GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, None)
 
         return created_version
@@ -546,6 +546,7 @@ class RepositoryMiner(object):
             db_session.commit()
         else:
             # read existing commit ids into memory
+            Log.info("Repository " + str(self.repository_orm.name) + " already in database.")
             self.__read_existings_commit_ids(self.repository_orm.id)
 
         return self.repository_orm.id
