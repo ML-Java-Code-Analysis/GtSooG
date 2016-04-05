@@ -21,4 +21,4 @@ class File(Base):
     timestamp = Column(DateTime, nullable=False)
     language = Column(String(20))
 
-    __table_args__ = (UniqueConstraint('path', 'timestamp'), )
+    __table_args__ = (UniqueConstraint('repository_id', 'path', 'timestamp'), )

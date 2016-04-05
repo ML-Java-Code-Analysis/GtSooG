@@ -15,6 +15,7 @@ from model.objects.Version import Version
 from utils import Log
 from sqlalchemy import desc
 from utils import Config
+from sqlalchemy.exc import IntegrityError
 
 # TODO Performance Optimierung mit Threads
 
@@ -326,8 +327,12 @@ class RepositoryMiner(object):
         if not model_file:
             return None
 
-        model_file.timestamp = timestamp
-        db_session.commit()
+        try:
+            model_file.timestamp = timestamp
+            db_session.commit()
+        except IntegrityError:
+            Log.warning("Created file already exists with same path and date. Using the already created file")
+
         try:
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
         except ValueError:
