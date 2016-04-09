@@ -20,4 +20,6 @@ class Commit(Base):
     message = Column(String(MAX_MESSAGE_LENGTH+1), nullable=False)
     author = Column(String(MAX_AUTHOR_LENGTH+1), nullable=False)
     timestamp = Column(DateTime, nullable=False)
+    complete = Column(Integer)
     issues = relationship("Issue", secondary=CommitIssue.__table__, back_populates="commits")
+

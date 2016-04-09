@@ -127,6 +127,7 @@ def parse_config(config_file):
         # REPOSITORYMINER Config
         try:
             global number_of_threads
+            Log.warning("Number of threads is not implemented and will be ignored.")
             if database_dialect == str(DIALECT_SQLITE):
                 Log.warning("Using SQLite as database engine: Only one thread supported. Processing might be slow.")
                 number_of_threads = 1
@@ -137,6 +138,7 @@ def parse_config(config_file):
 
         try:
             global number_of_database_sessions
+            Log.warning("Number of db sessions is not implemented and will be ignored.")
             if database_dialect == str(DIALECT_SQLITE):
                 Log.warning(
                     "Using SQLite as database engine: Only one database session supported. Processing might be slow.")

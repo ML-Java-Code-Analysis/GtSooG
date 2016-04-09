@@ -17,6 +17,7 @@ from sqlalchemy import desc
 from utils import Config
 from sqlalchemy.exc import IntegrityError
 
+
 # TODO Performance Optimierung mit Threads
 
 class RepositoryMiner(object):
@@ -34,11 +35,8 @@ class RepositoryMiner(object):
         self.branch = branch
 
         self.PROGRAMMING_LANGUAGES = Config.programming_languages
-        self.NUMBER_OF_THREADS = Config.number_of_threads
-        self.NUMBER_OF_DBSESSIONS = Config.number_of_database_sessions
         self.EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-        self.thread_db_sessions = {}
         self.init_db_sessions(db_session=db_session)
 
         self.existing_commit_ids = set()
@@ -58,27 +56,12 @@ class RepositoryMiner(object):
             self.db_session = DB.create_session()
         else:
             self.db_session = db_session
-            for i in range(self.NUMBER_OF_DBSESSIONS):
-                self.thread_db_sessions[i] = (False, DB.create_session())
 
     def close_all_db_sessions(self):
         """ Close DB session for every thread. And also main session.
 
         """
         self.db_session.close()
-        for i in self.thread_db_sessions.keys():
-            self.thread_db_sessions[i][1].close()
-
-    def __get_db_session(self):
-        """ Recycle DB session for threads
-
-        Returns: DB session which belongs to thread
-
-        """
-        for i in range(self.NUMBER_OF_DBSESSIONS):
-            session_tuple = self.thread_db_sessions[i]
-            if not session_tuple[0]:
-                return session_tuple[1]
 
     def __read_existings_commit_ids(self, repository_id):
         """Read existing commits from database and skip does which already exists
@@ -87,7 +70,7 @@ class RepositoryMiner(object):
             repository_id:
         """
         self.existing_commit_ids = set(
-            [t[0] for t in self.db_session.query(Commit.id).filter(Commit.repository_id == repository_id).all()])
+            [t[0] for t in self.db_session.query(Commit.id).filter(Commit.repository_id == repository_id, Commit.complete == 1).all()])
 
     def __commit_exists(self, commit_id):
         return commit_id in self.existing_commit_ids
@@ -113,22 +96,21 @@ class RepositoryMiner(object):
                 previous_commit = self.EMPTY_TREE_SHA
 
             if (len(commit.parents) <= 1) and (not self.__commit_exists(str(commit))):
-                if threading.active_count() < self.NUMBER_OF_THREADS:
-                    t = threading.Thread(target=self.__process_commit, args=(commit, previous_commit))
-                    threads.append(t)
-                    t.start()
-                else:
-                    self.__process_commit(commit, previous_commit, db_session=self.db_session)
-                    self.db_session.commit()
+                commit_orm = self.__process_commit(commit, previous_commit, db_session=self.db_session)
+                self.db_session.commit()
+
+                #To prevent that half commits are in database (when gtsoog dies)
+                commit_orm.complete = 1
+                self.db_session.commit()
 
     def __process_commit(self, commit, previous_commit, db_session=None):
-        """Process a single commit. In own method for usage with threads
+        """Process a single commit.
 
         Args:
             commit: Actual commit
             previous_commit: Previous commit for creating differences
             db_session: db session...
-        Returns: Nothing...
+        Returns: commit_orm object
 
         """
         db_session_local = None
@@ -150,34 +132,41 @@ class RepositoryMiner(object):
         renamed_files = manipulated_files['renamed_files']
         files_diff = manipulated_files['files_diff']
 
-        # no files were changed at all
-        if (not added_files) and (not deleted_files) and (not changed_files) and (not renamed_files) and (
-                not renamed_files):
-            return
-
         commit_time = datetime.datetime.utcfromtimestamp(commit.committed_date)
         timestamp = commit_time
         commit_id = str(commit)
 
-        self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit.author.name,
+        commit_orm = self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit.author.name,
                                  commit_time)
 
+        # no files were changed at all
+        if (not added_files) and (not deleted_files) and (not changed_files) and (not renamed_files) and (
+                not renamed_files):
+            return commit_orm
+
         if added_files:
-            # added_files_thread = threading.Thread(target=self.__thread_helper_added_file, args=(commit_id, added_files, files_diff, timestamp))
-            # added_files_thread.start()
-            self.__thread_helper_added_file(commit_id, added_files, files_diff, timestamp, db_session=db_session)
+            for file in added_files:
+                programming_language = self.__get_programming_langunage(file.path)
+
+                created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
+                                                      programming_language)
+                try:
+                    created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
+                except ValueError:
+                    Log.warning(
+                        "GityPython could not determine file size. Affected file: " + created_file.path + " Commit: " + commit_id)
+                    created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, None)
+
+                # skip this file because language is not interessting for us
+                if not programming_language:
+                    continue
+                self.__process_file_diff(db_session, file, files_diff, created_version)
 
         if deleted_files:
-            # deleted_files_thread = threading.Thread(target=self.__thread_helper_deleted_or_changed_file, args=(commit_id, deleted_files, files_diff, timestamp))
-            # deleted_files_thread.start()
-            self.__thread_helper_deleted_or_changed_file(commit_id, deleted_files, files_diff, timestamp,
-                                                         db_session=db_session)
+            self.__process_deleted_or_changed_files(commit_id, deleted_files, files_diff, timestamp, db_session)
 
         if changed_files:
-            # changed_files_thread = threading.Thread(target=self.__thread_helper_deleted_or_changed_file, args=(commit_id, changed_files, files_diff, timestamp))
-            # changed_files_thread.start()
-            self.__thread_helper_deleted_or_changed_file(commit_id, changed_files, files_diff, timestamp,
-                                                         db_session=db_session)
+            self.__process_deleted_or_changed_files(commit_id, changed_files, files_diff, timestamp, db_session)
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -196,15 +185,12 @@ class RepositoryMiner(object):
 
                 created_file = self.__create_new_file(db_session, str(new_file.path), timestamp, self.repository_id,
                                                       programming_language, model_file.id)
-                db_session.commit()
 
-        if not commit_processing_successful and self.NUMBER_OF_THREADS:
+        if not commit_processing_successful:
             Log.warning("Could not process commit " + str(commit_id) + ". Files added: " + str(
                 manipulated_files['added_files']) + " files deleted: " + str(
                 manipulated_files['deleted_files']) + " files changed: " + str(
                 manipulated_files['changed_files']) + " files renamed: " + str(manipulated_files['renamed_files']))
-
-        db_session.commit()
 
         if added_files_thread:
             added_files_thread.join()
@@ -216,44 +202,11 @@ class RepositoryMiner(object):
         if db_session_local:
             db_session.close()
 
-    def __thread_helper_added_file(self, commit_id, files, files_diff, timestamp, db_session=None):
-        """Handle added files in commit. Iterates all added files and create new entries in database
+        return commit_orm
 
-        Args:
-            commit_id:
-            files: all added files
-            files_diff: diff of added files
-            timestamp: commit timestamp
-            db_session:
-        """
-        db_session_local = False
-        if not db_session:
-            db_session_local = True
-            db_session = DB.create_session()
-        for file in files:
-            programming_language = self.__get_programming_langunage(file.path)
-
-            created_file = self.__create_new_file(db_session, str(file.path), timestamp, self.repository_id,
-                                                  programming_language)
-            db_session.commit()
-            try:
-                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, file.size)
-            except ValueError:
-                Log.warning(
-                    "GityPython could not determine file size. Affected file: " + created_file.path + " Commit: " + commit_id)
-                created_version = self.__create_new_version(db_session, created_file.id, commit_id, 0, 0, None)
-
-            # skip this file because language is not interessting for us
-            if not programming_language:
-                continue
-            self.__process_file_diff(db_session, file, files_diff, created_version)
-
-        if db_session_local:
-            db_session.close()
-
-    def __thread_helper_deleted_or_changed_file(self, commit_id, files, files_diff, timestamp,
-                                                db_session=None):
+    def __process_deleted_or_changed_files(self, commit_id, files, files_diff, timestamp, db_session):
         """Handle changed or deleted files in commit. (Same handeling...) Iterates all changed and deleted files and create new entries in database
+        Put this in its one method because handeling of delted and changed file is similar
 
         Args:
             commit_id:
@@ -265,10 +218,6 @@ class RepositoryMiner(object):
         Returns: Nothing
 
         """
-        db_session_local = False
-        if not db_session:
-            db_session_local = True
-            db_session = DB.create_session()
         for file in files:
 
             try:
@@ -277,9 +226,6 @@ class RepositoryMiner(object):
             except ValueError:
                 Log.warning("Could not process commit " + str(commit_id) + ". Files affected: " + str(files))
                 return
-
-        if db_session_local:
-            db_session.close()
 
     def __process_deleted_or_changed_file(self, db_session, commit_id, file, files_diff, timestamp):
         """Process single changed or deleted file. Creates new file version in database
@@ -329,6 +275,8 @@ class RepositoryMiner(object):
 
         try:
             model_file.timestamp = timestamp
+
+            # We have to commit here otherwise db constraint fails
             db_session.commit()
         except IntegrityError:
             Log.warning("Created file already exists with same path and date. Using the already created file")
@@ -336,7 +284,8 @@ class RepositoryMiner(object):
         try:
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, file.size)
         except ValueError:
-            Log.warning("GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
+            Log.warning(
+                "GityPython could not determine file size. Affected file: " + file.path + " Commit: " + commit_id)
             created_version = self.__create_new_version(db_session, model_file.id, commit_id, 0, 0, None)
 
         return created_version
@@ -575,9 +524,12 @@ class RepositoryMiner(object):
                 repository_id=repository_id,
                 author=author[0:MAX_AUTHOR_LENGTH],
                 message=message[0:MAX_MESSAGE_LENGTH],
-                timestamp=timestamp
+                timestamp=timestamp,
+                complete=0
             )
             db_session.add(commit_orm)
+
+        return commit_orm
 
     def __create_new_file(self, db_session, file_path, timestamp, repository_id, language, precursor_file_id=None):
         """Create new file record in database if not exists
@@ -605,6 +557,8 @@ class RepositoryMiner(object):
                 language=language
             )
             db_session.add(file_orm)
+            # We have to commit here other wise DB constraints fails
+            db_session.commit()
         return file_orm
 
     def __create_new_version(self, db_session, file_id, commit_id, lines_added,
