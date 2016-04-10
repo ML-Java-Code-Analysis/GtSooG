@@ -20,5 +20,5 @@ class Issue(Base):
     id = Column(String(20), primary_key=True)
     issue_tracking_id = Column(Integer, ForeignKey("issueTracking.id"), primary_key=True)
     title = Column(String(500))
-    commits = relationship("Commit", secondary=CommitIssue.__table__, back_populates="issues")
     type = Column(String(20), nullable=False)
+    commits = relationship("Commit", secondary=CommitIssue.__table__, back_populates="issues")

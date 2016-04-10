@@ -16,5 +16,5 @@ class CommitIssue(Base):
     issue_tracking_id = Column('issue_tracking_id', Integer, primary_key=True)
 
     __table_args__ = (ForeignKeyConstraint([issue_id, issue_tracking_id],
-                                           ['issue.id', 'issue.issue_tracking_id']),
-                      {})
+                                             ['issue.id', 'issue.issue_tracking_id']),
+                        {})

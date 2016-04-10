@@ -22,4 +22,3 @@ class Commit(Base):
     timestamp = Column(DateTime, nullable=False)
     complete = Column(Integer)
     issues = relationship("Issue", secondary=CommitIssue.__table__, back_populates="commits")
-
