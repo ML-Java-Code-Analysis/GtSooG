@@ -3,4 +3,3 @@ src/__pycache__/
 *.pyc
 *.db
 *.cfg
-*.log
