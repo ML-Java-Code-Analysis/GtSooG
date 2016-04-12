@@ -22,6 +22,9 @@ number_of_database_sessions = None
 programming_languages = []
 issue_scanner_issue_id_regex = None
 write_lines_in_database = None
+log_mode = None
+log_file = None
+log_level = None
 
 DIALECT_SQLITE = 'sqlite'
 DIALECT_MYSQL = 'mysql'
@@ -166,3 +169,16 @@ def parse_config(config_file):
         global issue_scanner_issue_id_regex
         if 'ISSUESCANNER' in config and 'issue_id_regex' in config['ISSUESCANNER']:
             issue_scanner_issue_id_regex = config['ISSUESCANNER']['issue_id_regex']
+
+        # LOGGING config
+        global log_mode
+        if 'LOGGING' in config and 'log_mode' in config['LOGGING']:
+            log_mode = config['LOGGING']['log_mode']
+
+        global log_file
+        if 'LOGGING' in config and 'log_file' in config['LOGGING']:
+            log_file = config['LOGGING']['log_file']
+
+        global log_level
+        if 'LOGGING' in config and 'log_level' in config['LOGGING']:
+            log_level = config['LOGGING']['log_level']

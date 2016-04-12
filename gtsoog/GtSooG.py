@@ -6,6 +6,7 @@ from repository.RepositoryMiner import RepositoryMiner
 from utils import Config
 from utils import Log
 
+
 def main():
     cli_args = Config.parse_arguments()
 
@@ -14,6 +15,8 @@ def main():
         Log.error("A config file must be specified!")
         return
     Config.parse_config(cli_args.config_file)
+
+    Log.config()
 
     Log.info("Started. Creating database")
     DB.create_db()
@@ -35,6 +38,7 @@ def main():
 
     IssueScanner.scan_for_repository(repository)
     db_session.close()
+
 
 main()
 
