@@ -32,6 +32,8 @@ class RepositoryMiner(object):
 
         self.PROGRAMMING_LANGUAGES = Config.programming_languages
         self.EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+        #Size of the return character for calculating file size
         self.RETURN_SIGN_SIZE = 2
 
         self.init_db_sessions(db_session=db_session)
@@ -135,6 +137,8 @@ class RepositoryMiner(object):
         Args:
             commit: Actual commit
             previous_commit: Previous commit for creating differences
+            project_size: Actual size of the project
+            project_file_count: Acutal filecount of the project
             db_session: db session...
         Returns: commit_orm object
 
@@ -198,7 +202,7 @@ class RepositoryMiner(object):
 
                 try:
                     version_orm = self.__process_deleted_or_changed_file(db_session, commit_id, file, programming_language,
-                                                           files_diff, timestamp)
+                                                           files_diff)
                     version_orm.deleted=True
                     version_orm.file_size=0
                 except ValueError as e:
@@ -212,7 +216,7 @@ class RepositoryMiner(object):
 
                 try:
                     self.__process_deleted_or_changed_file(db_session, commit_id, file, programming_language,
-                                                           files_diff, timestamp)
+                                                           files_diff)
                 except ValueError as e:
                     Log.warning("Warning processing commit: " + str(commit_id) + ". File affected: " + str(file.path) + " Reason: " + str(e))
 
@@ -238,6 +242,7 @@ class RepositoryMiner(object):
                     continue
 
                 version_orm.file_size = old_version_orm.Version.file_size
+                self.__process_file_diff(db_session, commit_id, new_file, files_diff, version_orm)
 
         commit_orm.added_files_count=added_files_count
         commit_orm.deleted_files_count=deleted_files_count
@@ -256,7 +261,7 @@ class RepositoryMiner(object):
 
         return commit_orm
 
-    def __process_deleted_or_changed_file(self, db_session, commit_id, file, programming_language, files_diff, timestamp):
+    def __process_deleted_or_changed_file(self, db_session, commit_id, file, programming_language, files_diff):
         """Process single changed or deleted file. Creates new file version in database
 
         Args:
@@ -296,6 +301,7 @@ class RepositoryMiner(object):
 
         Args:
             db_session:
+            commit_id:
             file: affected file
             files_diff: diff of all files
             created_version: file version which diff belongs to
@@ -352,7 +358,6 @@ class RepositoryMiner(object):
                 renamed_files.append({'old_file': item.b_blob, 'new_file': item.a_blob})
 
         for item in diff_with_patch:
-            # TODO here we lose file size I guess. Compare it to original file
             files_diff.append(item.diff.decode("utf-8", "ignore"))
 
         return {'added_files': added_files, 'deleted_files': deleted_files, 'changed_files': changed_files,
@@ -409,6 +414,7 @@ class RepositoryMiner(object):
         because we compare commit with previous commit: Added and deleted lines are inverted
         Args:
             db_session:
+            commit_id:
             code: code changes (diff)
             version: file version
         """
@@ -437,7 +443,7 @@ class RepositoryMiner(object):
                     deleted_lines_counter -= offset
 
                 except:
-                    Log.error("Could no get diff information level strating with @@")
+                    Log.error("Could no get diff information level starting with @@")
                     raise "Diff Parse Error"
 
             # case deleted line (inverse because we compare current commit with previous)
