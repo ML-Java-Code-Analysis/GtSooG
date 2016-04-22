@@ -16,6 +16,7 @@ from utils import Log
 from sqlalchemy import desc
 from utils import Config
 
+
 class RepositoryMiner(object):
     def __init__(self, repository_path, name=None, db_session=None, branch='master'):
         """ Initialize the Repository Miner
@@ -33,7 +34,7 @@ class RepositoryMiner(object):
         self.PROGRAMMING_LANGUAGES = Config.programming_languages
         self.EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-        #Size of the return character for calculating file size
+        # Size of the return character for calculating file size
         self.RETURN_SIGN_SIZE = 2
 
         self.init_db_sessions(db_session=db_session)
@@ -69,7 +70,8 @@ class RepositoryMiner(object):
             repository_id:
         """
         self.existing_commit_ids = set(
-            [t[0] for t in self.db_session.query(Commit.id).filter(Commit.repository_id == repository_id, Commit.complete == 1).all()])
+            [t[0] for t in self.db_session.query(Commit.id).filter(Commit.repository_id == repository_id,
+                                                                   Commit.complete == 1).all()])
 
     def __commit_exists(self, commit_id):
         return commit_id in self.existing_commit_ids
@@ -82,7 +84,8 @@ class RepositoryMiner(object):
         Returns: project file count of the lastest commit in database
         """
         try:
-            commit_orm = self.db_session.query(Commit).filter(Commit.repository_id == repository_id).order_by(desc(Commit.timestamp)).first()
+            commit_orm = self.db_session.query(Commit).filter(Commit.repository_id == repository_id).order_by(
+                desc(Commit.timestamp)).first()
             return commit_orm.project_file_count
         except Exception:
             return 0
@@ -95,7 +98,8 @@ class RepositoryMiner(object):
         Returns: project size (only of interested code files) of the lastest commit in database
         """
         try:
-            commit_orm = self.db_session.query(Commit).filter(Commit.repository_id == repository_id).order_by(desc(Commit.timestamp)).first()
+            commit_orm = self.db_session.query(Commit).filter(Commit.repository_id == repository_id).order_by(
+                desc(Commit.timestamp)).first()
             return commit_orm.project_size
         except Exception:
             return 0
@@ -124,10 +128,11 @@ class RepositoryMiner(object):
             if (len(commit.parents) <= 1) and (not self.__commit_exists(str(commit))):
                 project_file_count = self.__get_project_file_count(self.repository_id)
                 project_size = self.__get_project_size(self.repository_id)
-                commit_orm = self.__process_commit(commit, previous_commit, project_size, project_file_count, db_session=self.db_session)
+                commit_orm = self.__process_commit(commit, previous_commit, project_size, project_file_count,
+                                                   db_session=self.db_session)
                 self.db_session.commit()
 
-                #To prevent that half commits are in database (when gtsoog dies)
+                # To prevent that half commits are in database (when gtsoog dies)
                 commit_orm.complete = True
                 self.db_session.commit()
 
@@ -167,11 +172,11 @@ class RepositoryMiner(object):
         new_project_file_count = project_file_count + added_files_count - deleted_files_count
 
         commit_time = datetime.datetime.utcfromtimestamp(commit.committed_date)
-        timestamp = commit_time
         commit_id = str(commit)
 
-        commit_orm = self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message, commit.author.email,
-                                 commit_time, 0, 0, 0, 0, project_size, new_project_file_count)
+        commit_orm = self.__create_new_commit(db_session, commit_id, self.repository_id, commit.message,
+                                              commit.author.email,
+                                              commit_time, 0, 0, 0, 0, project_size, new_project_file_count)
 
         # no files were changed at all / very unlikley
         if (not added_files) and (not deleted_files) and (not changed_files) and (not renamed_files) and (
@@ -183,13 +188,13 @@ class RepositoryMiner(object):
                 programming_language = self.__get_programming_langunage(file.path)
 
                 file_orm = self.__create_new_file(db_session, self.repository_id,
-                                                      programming_language)
+                                                  programming_language)
 
                 created_version = self.__create_new_version(db_session, file_orm.id, commit_id, 0, 0, 0, file.path)
 
                 # skip this file because language is not interessting for us
                 if not programming_language:
-                    added_files_count-=1
+                    added_files_count -= 1
                     continue
 
                 self.__process_file_diff(db_session, commit_id, file, files_diff, created_version)
@@ -198,28 +203,30 @@ class RepositoryMiner(object):
             for file in deleted_files:
                 programming_language = self.__get_programming_langunage(file.path)
                 if not programming_language:
-                    deleted_files_count-=1
+                    deleted_files_count -= 1
 
                 try:
-                    version_orm = self.__process_deleted_or_changed_file(db_session, commit_id, file, programming_language,
-                                                           files_diff)
-                    version_orm.deleted=True
-                    version_orm.file_size=0
+                    version_orm = self.__process_deleted_or_changed_file(db_session, commit_id, file,
+                                                                         programming_language,
+                                                                         files_diff)
+                    version_orm.deleted = True
+                    version_orm.file_size = 0
                 except ValueError as e:
-                    Log.warning("Warning processing commit: " + str(commit_id) + ". File affected: " + str(file.path) + " Reason: " + str(e))
+                    Log.warning("Warning processing commit: " + str(commit_id) + ". File affected: " + str(
+                        file.path) + " Reason: " + str(e))
 
         if changed_files:
             for file in changed_files:
                 programming_language = self.__get_programming_langunage(file.path)
                 if not programming_language:
-                    changed_files_count-=1
+                    changed_files_count -= 1
 
                 try:
                     self.__process_deleted_or_changed_file(db_session, commit_id, file, programming_language,
                                                            files_diff)
                 except ValueError as e:
-                    Log.warning("Warning processing commit: " + str(commit_id) + ". File affected: " + str(file.path) + " Reason: " + str(e))
-
+                    Log.warning("Warning processing commit: " + str(commit_id) + ". File affected: " + str(
+                        file.path) + " Reason: " + str(e))
 
         # for renamed files just create a new one and link to the old one
         if renamed_files:
@@ -227,27 +234,31 @@ class RepositoryMiner(object):
                 old_file = file['old_file']
                 new_file = file['new_file']
 
-                old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id, Version.path == str(old_file.path)).order_by(
+                old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id,
+                                                                           Version.path == str(old_file.path)).order_by(
                     desc(Commit.timestamp)).first()
 
                 if not old_version_orm:
-                    Log.warning("Could not process commit " + str(commit_id) + ". Could not process rename because old file was not found. Old file: " + str(old_file.path)  + " new file: " + str(new_file.path))
+                    Log.warning("Could not process commit " + str(
+                        commit_id) + ". Could not process rename because old file was not found. Old file: " + str(
+                        old_file.path) + " new file: " + str(new_file.path))
 
-                version_orm = self.__create_new_version(db_session, old_version_orm.Version.file_id, commit_id, 0, 0, 0, new_file.path)
+                version_orm = self.__create_new_version(db_session, old_version_orm.Version.file_id, commit_id, 0, 0, 0,
+                                                        new_file.path)
 
                 # skip this file because language is not interessting for us
                 programming_language = self.__get_programming_langunage(new_file.path)
                 if not programming_language:
-                    renamed_files_count-=1
+                    renamed_files_count -= 1
                     continue
 
                 version_orm.file_size = old_version_orm.Version.file_size
                 self.__process_file_diff(db_session, commit_id, new_file, files_diff, version_orm)
 
-        commit_orm.added_files_count=added_files_count
-        commit_orm.deleted_files_count=deleted_files_count
-        commit_orm.changed_files_count=changed_files_count
-        commit_orm.renamed_files_count=renamed_files_count
+        commit_orm.added_files_count = added_files_count
+        commit_orm.deleted_files_count = deleted_files_count
+        commit_orm.changed_files_count = changed_files_count
+        commit_orm.renamed_files_count = renamed_files_count
 
         if added_files_thread:
             added_files_thread.join()
@@ -275,15 +286,16 @@ class RepositoryMiner(object):
 
         """
 
-        old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id, Version.path == str(file.path)).order_by(
-                    desc(Commit.timestamp)).first()
+        old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id,
+                                                                   Version.path == str(file.path)).order_by(
+            desc(Commit.timestamp)).first()
 
-        #file is probably a .orig file from a git merge ignore it
+        # file is probably a .orig file from a git merge ignore it
         if not old_version_orm:
             raise ValueError('file reference not yet in database, probably a .orig file from a merge')
 
-        version_orm = self.__create_new_version(db_session, old_version_orm.Version.file_id, commit_id, 0, 0, 0, file.path)
-
+        version_orm = self.__create_new_version(db_session, old_version_orm.Version.file_id, commit_id, 0, 0, 0,
+                                                file.path)
 
         # File is not yet in database
         if not version_orm:
@@ -310,11 +322,13 @@ class RepositoryMiner(object):
 
         """
         if Config.write_lines_in_database:
-            # File could not be found in diff
             file_diff = self.__get_diff_for_file(files_diff, str(file.path))
+
+            # File could not be found in diff
             if not file_diff:
                 return
-            self.__process_code_lines(db_session, commit_id, file_diff['code'], version_orm)
+
+            self.__process_code_lines(db_session, commit_id, file, file_diff['code'], version_orm)
 
     def __get_commits(self):
         """Get all commits of a repository
@@ -392,7 +406,7 @@ class RepositoryMiner(object):
 
             # renamed file 1
             elif diff_lines[0][6:] != diff_lines[1][6:]:
-                filename = diff_lines[1][6:]
+                filename = diff_lines[0][6:]
 
             # renamed file 2. Not realy recognized as rename by git. Don't know what to do with that...
             elif "similarity index 100%" in diff_lines[0]:
@@ -409,14 +423,14 @@ class RepositoryMiner(object):
 
         return None
 
-    def __process_code_lines(self, db_session, commit_id, code, version_orm):
+    def __process_code_lines(self, db_session, commit_id, file, code, version_orm):
         """Process code lines in diff and add it to the database
         because we compare commit with previous commit: Added and deleted lines are inverted
         Args:
             db_session:
             commit_id:
             code: code changes (diff)
-            version: file version
+            version_orm: file version
         """
         added_lines_counter = 0
         added_lines = 0
@@ -447,19 +461,18 @@ class RepositoryMiner(object):
                     raise "Diff Parse Error"
 
             # case deleted line (inverse because we compare current commit with previous)
-            if diff_line.startswith('+', 0, 1):
+            elif diff_line.startswith('+', 0, 1):
                 self.__create_new_line(db_session, diff_line[1:], deleted_lines_counter, TYPE_DELETED, version_orm.id)
                 deleted_lines += 1
                 added_lines_counter -= 1
-                changed_line_size -= len(diff_line[1:])+self.RETURN_SIGN_SIZE
-
+                changed_line_size -= (len(diff_line[1:]) + self.RETURN_SIGN_SIZE)
             # case added line (inverse because we compare current commit with previous)
-            if diff_line.startswith('-', 0, 1):
+            elif diff_line.startswith('-', 0, 1):
                 self.__create_new_line(db_session, diff_line[1:], added_lines_counter,
                                        TYPE_ADDED, version_orm.id)
                 added_lines += 1
                 deleted_lines_counter -= 1
-                changed_line_size += len(diff_line[1:])+self.RETURN_SIGN_SIZE
+                changed_line_size += (len(diff_line[1:]) + self.RETURN_SIGN_SIZE)
 
             added_lines_counter += 1
             deleted_lines_counter += 1
@@ -467,20 +480,11 @@ class RepositoryMiner(object):
         version_orm.lines_added = added_lines
         version_orm.lines_deleted = deleted_lines
 
-        #set file size
-        old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id, Version.path == version_orm.path).order_by(
-                    desc(Commit.timestamp)).limit(2).all()
+        version_orm.file_size = file.size
 
-        if ( len(old_version_orm) == 1 ):
-            old_file_size = old_version_orm[0].Version.file_size
-        else:
-            old_file_size = old_version_orm[1].Version.file_size
-
-        version_orm.file_size = old_file_size + changed_line_size
-
-        #set project size
+        # set project size
         commit_orm = self.db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
-        commit_orm.project_size+=version_orm.file_size
+        commit_orm.project_size += version_orm.file_size
 
     def __get_programming_langunage(self, path):
         """Get programming language by file extension
@@ -531,7 +535,9 @@ class RepositoryMiner(object):
 
         return self.repository_orm.id
 
-    def __create_new_commit(self, db_session, commit_id, repository_id, message, author, timestamp, added_files_count, deleted_files_count, changed_files_count, renamed_files_count, project_size, project_file_count):
+    def __create_new_commit(self, db_session, commit_id, repository_id, message, author, timestamp, added_files_count,
+                            deleted_files_count, changed_files_count, renamed_files_count, project_size,
+                            project_file_count):
         """Create new commit record in database if not exists
 
         Args:
@@ -582,10 +588,10 @@ class RepositoryMiner(object):
 
         """
         file_orm = File(
-                id=uuid().hex,
-                repository_id=repository_id,
-                language=language
-            )
+            id=uuid().hex,
+            repository_id=repository_id,
+            language=language
+        )
         db_session.add(file_orm)
         return file_orm
 
@@ -601,7 +607,7 @@ class RepositoryMiner(object):
             lines_added:
             lines_deleted:
             file_size:
-            path: Actual path of the file
+            file_path: Actual path of the file
 
         Returns: created version
 
