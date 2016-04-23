@@ -235,7 +235,7 @@ class RepositoryMiner(object):
                 new_file = file['new_file']
 
                 old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id,
-                                                                           Version.path == str(old_file.path)).order_by(
+                                                                           Version.path == str(old_file.path), Commit.repository_id == str(self.repository_id)).order_by(
                     desc(Commit.timestamp)).first()
 
                 if not old_version_orm:
@@ -287,7 +287,7 @@ class RepositoryMiner(object):
         """
 
         old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id,
-                                                                   Version.path == str(file.path)).order_by(
+                                                                   Version.path == str(file.path), Commit.repository_id == str(self.repository_id)).order_by(
             desc(Commit.timestamp)).first()
 
         # file is probably a .orig file from a git merge ignore it
@@ -483,7 +483,7 @@ class RepositoryMiner(object):
         version_orm.file_size = file.size
 
         # set project size
-        commit_orm = self.db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
+        commit_orm = self.db_session.query(Commit).filter(Commit.id == commit_id, Commit.repository_id == str(self.repository_id)).one_or_none()
         commit_orm.project_size += version_orm.file_size
 
     def __get_programming_langunage(self, path):
@@ -556,7 +556,7 @@ class RepositoryMiner(object):
         """
         # Try to retrieve the commit record, if not found a new one is created.
         # TODO: Now that existing commits are skipped anyway, this query could be removed for performance
-        commit_orm = db_session.query(Commit).filter(Commit.id == commit_id).one_or_none()
+        commit_orm = db_session.query(Commit).filter(Commit.id == commit_id, Commit.repository_id == str(self.repository_id)).one_or_none()
         if not commit_orm:
             commit_orm = Commit(
                 id=commit_id,
