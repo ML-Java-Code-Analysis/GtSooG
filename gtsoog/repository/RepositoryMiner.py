@@ -242,6 +242,7 @@ class RepositoryMiner(object):
                     Log.warning("Could not process commit " + str(
                         commit_id) + ". Could not process rename because old file was not found. Old file: " + str(
                         old_file.path) + " new file: " + str(new_file.path))
+                    continue
 
                 version_orm = self.__create_new_version(db_session, old_version_orm.Version.file_id, commit_id, 0, 0, 0,
                                                         new_file.path)
