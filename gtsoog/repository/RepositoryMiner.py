@@ -235,25 +235,33 @@ class RepositoryMiner(object):
                 new_file = file['new_file']
 
                 old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id,
-                                                                           Version.path == str(old_file.path), Commit.repository_id == str(self.repository_id)).order_by(
+                                                                           Version.path == str(old_file.path),
+                                                                           Commit.repository_id == str(
+                                                                               self.repository_id)).order_by(
                     desc(Commit.timestamp)).first()
+
+                programming_language = self.__get_programming_langunage(new_file.path)
 
                 if not old_version_orm:
                     Log.warning("Could not process commit " + str(
                         commit_id) + ". Could not process rename because old file was not found. Old file: " + str(
                         old_file.path) + " new file: " + str(new_file.path))
-                    continue
-
-                version_orm = self.__create_new_version(db_session, old_version_orm.Version.file_id, commit_id, 0, 0, 0,
+                    file_orm = self.__create_new_file(db_session, self.repository_id,
+                                                      programming_language)
+                    old_version_orm = self.__create_new_version(db_session, file_orm.id, commit_id, 0, 0, 0,
+                                                                new_file.path)
+                    version_orm = old_version_orm
+                else:
+                    old_version_orm = old_version_orm.Version
+                    version_orm = self.__create_new_version(db_session, old_version_orm.file_id, commit_id, 0, 0, 0,
                                                         new_file.path)
 
                 # skip this file because language is not interessting for us
-                programming_language = self.__get_programming_langunage(new_file.path)
                 if not programming_language:
                     renamed_files_count -= 1
                     continue
 
-                version_orm.file_size = old_version_orm.Version.file_size
+                version_orm.file_size = old_version_orm.file_size
                 self.__process_file_diff(db_session, commit_id, new_file, files_diff, version_orm)
 
         commit_orm.added_files_count = added_files_count
@@ -288,7 +296,9 @@ class RepositoryMiner(object):
         """
 
         old_version_orm = db_session.query(Commit, Version).filter(Commit.id == Version.commit_id,
-                                                                   Version.path == str(file.path), Commit.repository_id == str(self.repository_id)).order_by(
+                                                                   Version.path == str(file.path),
+                                                                   Commit.repository_id == str(
+                                                                       self.repository_id)).order_by(
             desc(Commit.timestamp)).first()
 
         # file is probably a .orig file from a git merge ignore it
@@ -484,7 +494,8 @@ class RepositoryMiner(object):
         version_orm.file_size = file.size
 
         # set project size
-        commit_orm = self.db_session.query(Commit).filter(Commit.id == commit_id, Commit.repository_id == str(self.repository_id)).one_or_none()
+        commit_orm = self.db_session.query(Commit).filter(Commit.id == commit_id,
+                                                          Commit.repository_id == str(self.repository_id)).one_or_none()
         commit_orm.project_size += version_orm.file_size
 
     def __get_programming_langunage(self, path):
@@ -557,7 +568,8 @@ class RepositoryMiner(object):
         """
         # Try to retrieve the commit record, if not found a new one is created.
         # TODO: Now that existing commits are skipped anyway, this query could be removed for performance
-        commit_orm = db_session.query(Commit).filter(Commit.id == commit_id, Commit.repository_id == str(self.repository_id)).one_or_none()
+        commit_orm = db_session.query(Commit).filter(Commit.id == commit_id,
+                                                     Commit.repository_id == str(self.repository_id)).one_or_none()
         if not commit_orm:
             commit_orm = Commit(
                 id=commit_id,

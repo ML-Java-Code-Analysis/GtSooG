@@ -93,7 +93,7 @@ def log(message, level, mode=None, logfile=None):
         else:
             f = open(logfile, 'w')
             file_pointers[logfile] = f
-        f.write(log_msg)
+        f.write(log_msg + "\n")
 
 
 def error(message, mode=default_mode, logfile=None):
