@@ -7,6 +7,7 @@ from utils import Log
 
 # Config parameters
 repository_path = None
+repository_branch = None
 issue_tracking_system = None
 issue_tracking_url = None
 issue_tracking_username = None
@@ -103,6 +104,13 @@ def parse_config(config_file):
             repository_path = config['REPOSITORY']['repository_path']
         except KeyError:
             raise EnvironmentError('Repository Path is missing in config file')
+
+        try:
+            global repository_branch
+            repository_branch = config['REPOSITORY']['repository_branch']
+        except KeyError:
+            repository_branch = 'master'
+            Log.info("Repository Branch is missing in config file. Using master branch")
 
         try:
             global issue_tracking_system

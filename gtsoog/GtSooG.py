@@ -25,7 +25,8 @@ def main():
 
     miner = RepositoryMiner(
         Config.repository_path,
-        db_session=db_session
+        db_session=db_session,
+        branch=Config.repository_branch
     )
     repository = miner.repository_orm
 
